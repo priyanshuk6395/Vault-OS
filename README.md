@@ -10,10 +10,6 @@
 
 [**Explore the Vault**](#) • [**Documentation**](#) • [**Architecture**](#)
 
-<br/>
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png" width="100%">
-
 </div>
 
 ## 🌌 The Concept
@@ -27,11 +23,6 @@
 * **☁️ Node Architecture:** Built on Next.js 15 Server Components for military-grade data isolation.
 
 <br/>
-
-<div align="center">
-  <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJqZ3R5Z3R5Z3R5Z3R5Z3R5Z3R5Z3R5Z3R5Z3R5Z3R5Z3R5JmScope=7/233345/giphy.gif" width="80%" style="border-radius: 20px; border: 1px solid #c94a20;"/>
-  <p align="center"><i>System Status: Operational. Biometric Engine: Primed.</i></p>
-</div>
 
 ---
 ## 🧠 System Architecture: The Biometric Pipeline
@@ -66,6 +57,7 @@ To initialize the Vault, clone the repository and configure the **Tactical Envir
 # SYSTEM CORE
 DATABASE_URL="postgresql://user:password@localhost:5432/vault"
 NEXTAUTH_SECRET="SECURE_SYSTEM_HASH"
+NEXTAUTH_URL=
 
 # ADMIN PROTOCOLS
 ADMIN_USERNAME="operator_01"
@@ -76,7 +68,6 @@ AWS_REGION="us-east-1"
 AWS_ACCESS_KEY_ID="AKIA..."
 AWS_SECRET_ACCESS_KEY="s8k..."
 AWS_S3_BUCKET="event-vault-assets"
-AWS_REKOGNITION_COLLECTION_ID="vault-identity-pool"
 ```
 ---
 
