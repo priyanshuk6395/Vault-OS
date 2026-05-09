@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id                String   @id @default(uuid())
+  title             String
+  ownerId           String
+  passcode          String   @unique
+  guestUploadPolicy String   @default("allowed")
+  biometricSearch   Boolean  @default(true)
+  publicGallery     Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  // Relations
+  assets            Asset[]  
+  persons           Person[]
+}
+
+model Asset {
+  id              String    @id @default(uuid())
+  eventId         String
+  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  assetType       String    // 'image' or 'video'
+  sourceFilename  String?
+  storageKey      String    // S3 path
+  
+  status          String    @default("PENDING") 
+  moderationState String    @default("PENDING") 
+
+  mimeType        String?   // Added to fix previous Prisma error
+  fileSize        Int?      // Added to fix previous Prisma error
+
+  uploaderId      String?
+  
+  awsJobId        String?   @unique
+  errorMessage    String?   
+  jobStartedAt    DateTime?
+  jobCompletedAt  DateTime?
+  createdAt       DateTime  @default(now())
+
+  faceDetections  FaceDetection[]
+}
+
+model Person {
+  id              String   @id @default(uuid())
+  eventId         String
+  event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  name            String?  // Admin-provided name
+  status          String   @default("unnamed") // unnamed, named, merged
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  faceDetections  FaceDetection[]
+  samples         FaceSample[]
+}
+
+model FaceDetection {
+  id              String   @id @default(uuid())
+  assetId         String
+  asset           Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  personId        String
+  person          Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  
+  // AWS Rekognition Data
+  faceId          String   @unique // The ID from Rekognition
+  confidence      Float
+  boundingBox     Json     // {Top, Left, Width, Height}
+  
+  // Relations
+  samples         FaceSample[]
+}
+
+model FaceSample {
+  id              String        @id @default(uuid())
+  personId        String
+  person          Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  faceDetectionId String
+  faceDetection   FaceDetection @relation(fields: [faceDetectionId], references: [id], onDelete: Cascade)
+  
+  isReference     Boolean       @default(false) // Primary sample for guest retrieval
+  createdAt       DateTime      @default(now())
+
+  @@unique([personId, faceDetectionId])
+}
