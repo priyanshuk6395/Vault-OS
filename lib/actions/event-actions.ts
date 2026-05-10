@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { rekognitionClient,s3Client } from "@/lib/aws";
 import { DeleteCollectionCommand, DescribeCollectionCommand } from "@aws-sdk/client-rekognition";
-import { GetBucketLocationCommand,ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
+import { GetBucketLocationCommand,ListObjectsV2Command,ListObjectsV2CommandInput, DeleteObjectsCommand, DeleteObjectsCommandInput} from "@aws-sdk/client-s3";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -112,13 +112,13 @@ export async function deleteEvent(eventId: string) {
     const prefix = `events/${eventId}/`;
 
     while (isTruncated) {
-      const listParams = new ListObjectsV2Command({
+      const listParams: ListObjectsV2CommandInput = {
         Bucket: bucketName,
         Prefix: prefix,
         ContinuationToken: continuationToken,
-      });
+      };
       
-      const listResponse = await s3Client.send(listParams);
+      const listResponse = await s3Client.send(new ListObjectsV2Command(listParams));
 
       if (listResponse.Contents && listResponse.Contents.length > 0) {
         const deleteParams = new DeleteObjectsCommand({

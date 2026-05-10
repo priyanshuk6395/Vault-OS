@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { CopyObjectCommand,DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client } from '@/lib/aws';
 
 export async function POST(req: Request) {
