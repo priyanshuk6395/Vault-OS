@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { rekognitionClient,s3Client } from "@/lib/aws";
 import { DeleteCollectionCommand, DescribeCollectionCommand } from "@aws-sdk/client-rekognition";
-import { GetBucketLocationCommand } from "@aws-sdk/client-s3";
+import { GetBucketLocationCommand,ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -102,17 +102,61 @@ export async function getEventSettings(eventId: string) {
  */
 export async function deleteEvent(eventId: string) {
   try {
+    const bucketName = process.env.AWS_S3_BUCKET;
+    if (!bucketName) throw new Error("AWS_S3_BUCKET environment variable is missing.");
+
+    // 1. PURGE S3 INFRASTRUCTURE (The "Folder" Deletion)
+    // S3 requires us to list all objects with the event prefix and delete them in batches.
+    let isTruncated = true;
+    let continuationToken: string | undefined = undefined;
+    const prefix = `events/${eventId}/`;
+
+    while (isTruncated) {
+      const listParams = new ListObjectsV2Command({
+        Bucket: bucketName,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      });
+      
+      const listResponse = await s3Client.send(listParams);
+
+      if (listResponse.Contents && listResponse.Contents.length > 0) {
+        const deleteParams = new DeleteObjectsCommand({
+          Bucket: bucketName,
+          Delete: {
+            Objects: listResponse.Contents.map((item) => ({ Key: item.Key })),
+            Quiet: true, // Prevents returning a massive list of deleted items
+          },
+        });
+        await s3Client.send(deleteParams);
+      }
+
+      isTruncated = listResponse.IsTruncated ?? false;
+      continuationToken = listResponse.NextContinuationToken;
+    }
+
+    // 2. PURGE REKOGNITION BIOMETRIC DATA
     const collectionId = `event-${eventId}`;
-    // Attempt to delete the AWS Collection first
     try {
       await rekognitionClient.send(new DeleteCollectionCommand({ CollectionId: collectionId }));
-    } catch (e) { console.warn("Collection already deleted or missing."); }
+    } catch (e) { 
+      console.warn(`[Vault OS] Collection ${collectionId} missing or already purged.`); 
+    }
 
-    await prisma.event.delete({ where: { id: eventId } });
+    // 3. PURGE DATABASE RECORDS
+    // Because your schema uses `@relation(..., onDelete: Cascade)`, deleting the 
+    // Event will automatically wipe all Assets, Persons, and FaceDetections linked to it.
+    await prisma.event.delete({ 
+      where: { id: eventId } 
+    });
+
+    // 4. REFRESH UI STATE
     revalidatePath("/admin");
+    
     return { success: true };
   } catch (error: any) {
-    return { error: error.message || "Failed to purge infrastructure" };
+    console.error("[CRITICAL_PURGE_ERROR]:", error);
+    return { error: error.message || "Failed to execute infrastructure purge protocol." };
   }
 }
 
