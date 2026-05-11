@@ -1,29 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { X, Upload, ImageIcon, Loader2, CheckCircle2 } from "lucide-react";
-import imageCompression from "browser-image-compression";
-import heic2any from "heic2any";
+import { X, Upload, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUpload } from "@/context/UploadProvider";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface UploadDialogProps {
   eventId: string;
   isOpen: boolean;
   onClose: () => void;
-  onUploadComplete: () => void;
+  onUploadComplete?: () => void; // Optional now, since background handles it
 }
 
 export default function UploadDialog({
   eventId,
   isOpen,
   onClose,
-  onUploadComplete,
 }: UploadDialogProps) {
   const [files, setFiles] = useState<File[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState<{ [key: string]: number }>({});
-  const [statusMessage, setStatusMessage] = useState<string>("");
+  
+  // 1. Hook into the Global Background Queue
+  const { addFilesToQueue } = useUpload();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -31,109 +29,24 @@ export default function UploadDialog({
     }
   };
 
-  async function compressImageResilient(file: File) {
-    const options = {
-      maxSizeMB: 1,
-      maxWidthOrHeight: 2048,
-      useWebWorker: true,
-      initialQuality: 0.8,
-    };
-    try {
-      return await imageCompression(file, options);
-    } catch (error) {
-      console.warn(`[Compression Skip] ${file.name}: Proceeding with original.`);
-      return file;
-    }
-  }
-
-  const uploadFiles = async () => {
-    if (!eventId || eventId === "undefined") {
-      console.error("[PIPELINE_ABORT] Missing eventId. Check parent component props.");
-      setStatusMessage("Error: System failed to resolve Vault ID.");
+  // 2. The Instant Handoff Protocol
+  const handleCommit = () => {
+    if (files.length === 0 || !eventId || eventId === "undefined") {
+      console.error("[PIPELINE_ABORT] Missing files or Vault ID.");
       return;
     }
 
-    setUploading(true);
-    setStatusMessage("Initializing vault ingestion...");
-
-    const uploadTasks = files.map(async (file) => {
-      try {
-        let fileToProcess = file;
-
-        if (file.name.match(/\.(heic|heif)$/i)) {
-          setStatusMessage(`Converting ${file.name}...`);
-          try {
-            const blob = await heic2any({
-              blob: file,
-              toType: "image/jpeg",
-              quality: 0.8,
-            });
-            const blobData = Array.isArray(blob) ? blob[0] : blob;
-            fileToProcess = new File(
-              [blobData],
-              file.name.replace(/\.(heic|heif)$/i, ".jpg"),
-              { type: "image/jpeg" }
-            );
-          } catch (err) {
-            console.warn(`[HEIC Skip] ${file.name}: Fallback to original.`);
-          }
-        }
-
-        setStatusMessage(`Optimizing ${fileToProcess.name}...`);
-        const finalFile = await compressImageResilient(fileToProcess);
-
-        const initRes = await fetch("/api/upload/init", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            eventId,
-            filename: finalFile.name,
-            contentType: finalFile.type,
-            size: finalFile.size,
-            assetType: "image",
-          }),
-        });
-
-        if (!initRes.ok) {
-           const errText = await initRes.text();
-           throw new Error(`Init Failed (${initRes.status}): ${errText}`);
-        }
-
-        const { uploadUrl, assetId } = await initRes.json();
-
-        await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", uploadUrl);
-          xhr.setRequestHeader("Content-Type", finalFile.type);
-
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              const percent = Math.round((event.loaded / event.total) * 100);
-              setProgress((prev) => ({ ...prev, [file.name]: percent }));
-            }
-          };
-
-          xhr.onload = () => (xhr.status === 200 ? resolve(true) : reject());
-          xhr.onerror = () => reject();
-          xhr.send(finalFile);
-        });
-
-        await fetch("/api/upload/complete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assetId }),
-        });
-
-      } catch (err) {
-        console.error(`[CRITICAL_PIPELINE_ERROR] ${file.name}:`, err);
-        setProgress((prev) => ({ ...prev, [file.name]: 0 }));
-      }
-    });
-
-    await Promise.all(uploadTasks);
-    setUploading(false);
+    // Push to the background throttle engine
+    addFilesToQueue(files, eventId);
+    
+    // Instantly clear the local state and close the modal
     setFiles([]);
-    onUploadComplete();
+    onClose();
+  };
+
+  // If a user clicks cancel, we just clear the staged files and close
+  const handleAbort = () => {
+    setFiles([]);
     onClose();
   };
 
@@ -141,16 +54,16 @@ export default function UploadDialog({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* 1. Backdrop Animation */}
+          {/* Backdrop Animation */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={!uploading ? onClose : undefined}
+            onClick={handleAbort}
             className="absolute inset-0 bg-black/60 backdrop-blur-md"
           />
 
-          {/* 2. Modal Entrance/Exit */}
+          {/* Modal Entrance/Exit */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -163,22 +76,14 @@ export default function UploadDialog({
                 <h3 className="text-xl font-extrabold text-[#0e0e0f] tracking-tighter">
                   System Ingestion
                 </h3>
-                <AnimatePresence mode="wait">
-                  <motion.p
-                    key={statusMessage || "awaiting"}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    className="text-[11px] font-mono font-bold uppercase tracking-[0.22em] text-[#c94a20] mt-1.5"
-                  >
-                    {uploading ? statusMessage : "Awaiting Assets"}
-                  </motion.p>
-                </AnimatePresence>
+                <p className="text-[11px] font-mono font-bold uppercase tracking-[0.22em] text-[#c94a20] mt-1.5">
+                  Staging Environment
+                </p>
               </div>
               <motion.button 
                 whileHover={{ scale: 1.1, rotate: 90 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={onClose} 
+                onClick={handleAbort} 
                 className="p-2.5 hover:bg-black/5 rounded-full transition-colors"
               >
                 <X size={20} className="text-[#0e0e0f]" />
@@ -204,7 +109,7 @@ export default function UploadDialog({
                 <span className="text-sm font-bold uppercase tracking-tight text-[#0e0e0f] relative z-10">
                   {files.length > 0 ? `${files.length} FILES STAGED` : "Select Archive Files"}
                 </span>
-                <input type="file" multiple accept="image/*,.heic,.heif" className="hidden" onChange={handleFileSelect} disabled={uploading} />
+                <input type="file" multiple accept="image/*,.heic,.heif" className="hidden" onChange={handleFileSelect} />
               </label>
 
               {files.length > 0 && (
@@ -212,38 +117,22 @@ export default function UploadDialog({
                   <AnimatePresence>
                     {files.map((file, idx) => (
                       <motion.div 
-                        key={file.name}
+                        key={`${file.name}-${idx}`}
                         layout // Enables smooth re-ordering
                         initial={{ opacity: 0, x: -10, scale: 0.98 }}
                         animate={{ opacity: 1, x: 0, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ delay: idx * 0.04 }} // 3. Staggered Entrance
+                        transition={{ delay: idx * 0.04 }} // Staggered Entrance
                         className="bg-white border border-[#dbd8cf] p-4.5 rounded-2xl flex items-center gap-4.5 shadow-sm"
                       >
                         <ImageIcon size={19} className="text-[#c94a20] shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-center mb-1.5">
-                            <span className="text-[11px] font-bold truncate tracking-tight text-[#0e0e0f]">
-                              {file.name}
-                            </span>
-                            <span className="text-[10px] font-mono font-bold text-[#c94a20]">
-                              {progress[file.name] === 100 ? (
-                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                                  <CheckCircle2 size={15} className="text-green-600" />
-                                </motion.div>
-                              ) : (
-                                `${progress[file.name] || 0}%`
-                              )}
-                            </span>
-                          </div>
-                          <div className="w-full bg-[#dbd8cf]/40 h-1 rounded-full overflow-hidden">
-                            <motion.div 
-                              className="bg-[#c94a20] h-full" 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${progress[file.name] || 0}%` }}
-                              transition={{ ease: "easeOut" }}
-                            />
-                          </div>
+                          <span className="text-[11px] font-bold truncate tracking-tight text-[#0e0e0f] block">
+                            {file.name}
+                          </span>
+                          <span className="text-[9px] font-mono text-[#5a5a64]">
+                            Ready for background processing
+                          </span>
                         </div>
                       </motion.div>
                     ))}
@@ -254,34 +143,29 @@ export default function UploadDialog({
 
             <div className="p-8 bg-[#f5f4f0] border-t border-[#dbd8cf] flex gap-5 items-center z-10">
               <button 
-                onClick={onClose} 
-                disabled={uploading} 
-                className="w-[100px] text-left py-4 text-xs font-bold uppercase tracking-[0.3em] text-[#5a5a64] hover:text-[#0e0e0f] transition-colors disabled:opacity-30"
+                onClick={handleAbort} 
+                className="w-[100px] text-left py-4 text-xs font-bold uppercase tracking-[0.3em] text-[#5a5a64] hover:text-[#0e0e0f] transition-colors"
               >
                 Abort
               </button>
               <motion.button
-                whileHover={files.length > 0 && !uploading ? { scale: 1.01 } : {}}
-                whileTap={files.length > 0 && !uploading ? { scale: 0.97 } : {}}
-                onClick={uploadFiles}
-                disabled={files.length === 0 || uploading}
-                className="flex-1 py-4 bg-[#e8dbd1] text-[#0e0e0f] rounded-2xl text-xs font-bold uppercase tracking-[0.25em] disabled:opacity-40 flex items-center justify-center gap-3.5 overflow-hidden relative"
+                whileHover={files.length > 0 ? { scale: 1.01 } : {}}
+                whileTap={files.length > 0 ? { scale: 0.97 } : {}}
+                onClick={handleCommit}
+                disabled={files.length === 0}
+                className="flex-1 py-4 bg-[#c94a20] text-white rounded-2xl text-xs font-bold uppercase tracking-[0.25em] disabled:opacity-40 flex items-center justify-center gap-3.5 overflow-hidden relative shadow-lg shadow-[#c94a20]/20"
               >
                 {/* Button shine effect */}
-                {!uploading && files.length > 0 && (
+                {files.length > 0 && (
                   <motion.div 
                     animate={{ x: ["-100%", "200%"] }}
                     transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut", repeatDelay: 1 }}
-                    className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12"
+                    className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
                   />
                 )}
                 
-                {uploading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Upload size={17} className="text-[#0e0e0f]/60" />
-                )}
-                {uploading ? `Processing ${files.length}` : `Commit ${files.length} Assets`}
+                <Upload size={17} />
+                Send to Background
               </motion.button>
             </div>
           </motion.div>
