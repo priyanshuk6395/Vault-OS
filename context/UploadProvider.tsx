@@ -1,8 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useState, useRef, useEffect } from "react";
-import imageCompression from "browser-image-compression";
-import heic2any from "heic2any";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useRef,
+  useEffect,
+} from "react";
 
 interface UploadTask {
   id: string;
@@ -22,14 +26,14 @@ const UploadContext = createContext<UploadContextType | undefined>(undefined);
 
 export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
   const [queue, setQueue] = useState<UploadTask[]>([]);
-  
+
   // Ref tracks which IDs are actively being processed to prevent React double-fires
   const processingIds = useRef<Set<string>>(new Set());
   const MAX_CONCURRENCY = 2; // Magic number to prevent mobile RAM crashes
 
   const updateTask = (id: string, updates: Partial<UploadTask>) => {
     setQueue((prev) =>
-      prev.map((task) => (task.id === id ? { ...task, ...updates } : task))
+      prev.map((task) => (task.id === id ? { ...task, ...updates } : task)),
     );
   };
 
@@ -46,55 +50,27 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
     setQueue((prev) => [...prev, ...newTasks]);
   };
 
-  // ⚙️ THE ENGINE LOOP: Automatically triggers when the queue changes
-  useEffect(() => {
-    const startNextTasks = () => {
-      // Find tasks that are pending AND not already locked in the processing set
-      const pendingTasks = queue.filter(
-        (t) => t.status === "pending" && !processingIds.current.has(t.id)
-      );
-
-      // Fill available slots up to MAX_CONCURRENCY
-      for (const task of pendingTasks) {
-        if (processingIds.current.size >= MAX_CONCURRENCY) break;
-
-        // 1. Lock the task slot
-        processingIds.current.add(task.id);
-        
-        // 2. Update UI State
-        updateTask(task.id, { status: "processing" });
-
-        // 3. Execute the pipeline
-        executeUploadPipeline(task.file!, task.id, task.eventId)
-          .then(() => {
-            // Unlock and mark complete
-            processingIds.current.delete(task.id);
-            updateTask(task.id, { status: "complete", progress: 100 });
-          })
-          .catch((err) => {
-            console.error(`[PIPELINE_FAILED] ${task.fileName}:`, err);
-            // Unlock and mark as error
-            processingIds.current.delete(task.id);
-            updateTask(task.id, { status: "error" });
-          });
-      }
-    };
-
-    startNextTasks();
-  }, [queue]); // Re-evaluate whenever the queue changes
-
-  const executeUploadPipeline = async (file: File, taskId: string, eventId: string) => {
+  const executeUploadPipeline = async (
+    file: File,
+    taskId: string,
+    eventId: string,
+  ) => {
     let fileToProcess = file;
 
     // 1. HEIC Conversion
     if (file.name.match(/\.(heic|heif)$/i)) {
       try {
-        const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.8 });
+        const heic2any = (await import("heic2any")).default;
+        const blob = await heic2any({
+          blob: file,
+          toType: "image/jpeg",
+          quality: 0.8,
+        });
         const blobData = Array.isArray(blob) ? blob[0] : blob;
         fileToProcess = new File(
           [blobData],
           file.name.replace(/\.(heic|heif)$/i, ".jpg"),
-          { type: "image/jpeg" }
+          { type: "image/jpeg" },
         );
       } catch (err) {
         console.warn(`[HEIC Skip] ${file.name}: Fallback to original.`);
@@ -103,6 +79,8 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
 
     // 2. RAM-Intensive Compression
     try {
+      const imageCompression = (await import("browser-image-compression"))
+        .default;
       fileToProcess = await imageCompression(fileToProcess, {
         maxSizeMB: 1,
         maxWidthOrHeight: 2048,
@@ -143,7 +121,8 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
         }
       };
 
-      xhr.onload = () => (xhr.status === 200 ? resolve(true) : reject("S3 PUT Failed"));
+      xhr.onload = () =>
+        xhr.status === 200 ? resolve(true) : reject("S3 PUT Failed");
       xhr.onerror = () => reject("Network Error");
       xhr.send(fileToProcess);
     });
@@ -156,6 +135,43 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
+  // ⚙️ THE ENGINE LOOP: Automatically triggers when the queue changes
+  useEffect(() => {
+    const startNextTasks = () => {
+      // Find tasks that are pending AND not already locked in the processing set
+      const pendingTasks = queue.filter(
+        (t) => t.status === "pending" && !processingIds.current.has(t.id),
+      );
+
+      // Fill available slots up to MAX_CONCURRENCY
+      for (const task of pendingTasks) {
+        if (processingIds.current.size >= MAX_CONCURRENCY) break;
+
+        // 1. Lock the task slot
+        processingIds.current.add(task.id);
+
+        // 2. Update UI State
+        updateTask(task.id, { status: "processing" });
+
+        // 3. Execute the pipeline
+        executeUploadPipeline(task.file!, task.id, task.eventId)
+          .then(() => {
+            // Unlock and mark complete
+            processingIds.current.delete(task.id);
+            updateTask(task.id, { status: "complete", progress: 100 });
+          })
+          .catch((err) => {
+            console.error(`[PIPELINE_FAILED] ${task.fileName}:`, err);
+            // Unlock and mark as error
+            processingIds.current.delete(task.id);
+            updateTask(task.id, { status: "error" });
+          });
+      }
+    };
+
+    startNextTasks();
+  }, [queue]); // Re-evaluate whenever the queue changes
+
   return (
     <UploadContext.Provider value={{ queue, addFilesToQueue }}>
       {children}
@@ -165,6 +181,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
 
 export const useUpload = () => {
   const context = useContext(UploadContext);
-  if (!context) throw new Error("useUpload must be used within an UploadProvider");
+  if (!context)
+    throw new Error("useUpload must be used within an UploadProvider");
   return context;
 };
