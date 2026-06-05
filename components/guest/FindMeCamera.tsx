@@ -194,8 +194,7 @@ export default function FindMeCamera({ eventId }: { eventId: string }) {
       </div>
 
       {/* 🚀 AWS LIVENESS DETECTOR */}
-      <div className="rounded-[32px] overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(201,74,32,0.15)] relative bg-[#0d0d0f] h-[600px] sm:h-[650px] w-full flex flex-col">
-        <ThemeProvider theme={vaultTheme} colorMode="dark">
+      <div className="rounded-[24px] sm:rounded-[32px] overflow-y-auto overflow-x-hidden border border-white/10 shadow-[0_0_50px_rgba(201,74,32,0.15)] relative bg-[#0d0d0f] h-[85dvh] min-h-[650px] max-h-[800px] w-full flex flex-col">        <ThemeProvider theme={vaultTheme} colorMode="dark">
           <FaceLivenessDetector
             sessionId={sessionId}
             region={process.env.NEXT_PUBLIC_AWS_REGION || "ap-south-1"}
