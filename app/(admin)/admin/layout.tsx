@@ -20,10 +20,32 @@ export default function AdminLayout({
   const fullScreenRoutes = ["/admin", "/admin/new-event", "/admin/new"];
   const isMainDashboard = fullScreenRoutes.includes(pathname);
 
-  // Close the mobile menu automatically when the user navigates to a new page
-  useEffect(() => {
+  // Close the mobile menu automatically AND fire the telemetry tracker
+useEffect(() => {
     setIsMobileMenuOpen(false);
-  }, [pathname]);
+
+    // 🕵️‍♂️ SILENT ADMIN TELEMETRY TRACKER (Throttled)
+    if (!isMainDashboard && pathname) {
+      const eventId = pathname.split('/')[2]; 
+      
+      if (eventId && eventId !== 'new-event' && eventId !== 'new') {
+        const telemetryKey = `telemetry_logged_${eventId}`;
+        
+        // Only log if we haven't already logged this event in this browser session
+        if (!sessionStorage.getItem(telemetryKey)) {
+          fetch('/api/admin/log-telemetry', {
+            method: 'POST',
+            body: JSON.stringify({ eventId }),
+            headers: { "Content-Type": "application/json" }
+          }).catch((err) => {
+            console.warn("[Telemetry] Silent ping failed", err);
+          });
+          
+          sessionStorage.setItem(telemetryKey, "true");
+        }
+      }
+    }
+  }, [pathname, isMainDashboard]);
 
   return (
     <UploadProvider>

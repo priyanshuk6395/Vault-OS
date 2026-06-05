@@ -1,218 +1,219 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Webcam from "react-webcam";
-import { Camera, Loader2, Sparkles, ScanFace, Focus } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion"; // <-- Added for cinematic scanner
-import { toast } from "sonner"; // <-- Added to replace basic alerts
+import { FaceLivenessDetector } from "@aws-amplify/ui-react-liveness";
+import {
+  ThemeProvider,
+  defaultDarkModeOverride,
+  Theme,
+} from "@aws-amplify/ui-react";
+import { Amplify } from "aws-amplify";
+import { Loader2, ScanFace, ShieldCheck, Fingerprint } from "lucide-react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import "@aws-amplify/ui-react/styles.css";
+
+// Configure Amplify
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      identityPoolId: process.env.NEXT_PUBLIC_AWS_IDENTITY_POOL_ID || "",
+      allowGuestAccess: true,
+    },
+  },
+});
+
+// 🎨 AWS NATIVE THEME OVERRIDE
+// Forces the Amplify component to use your Vault OS orange instead of default blue
+const vaultTheme: Theme = {
+  name: "vault-os-theme",
+  overrides: [defaultDarkModeOverride],
+  tokens: {
+    colors: {
+      background: {
+        primary: { value: "#0d0d0f" },
+        secondary: { value: "#121214" },
+      },
+      primary: {
+        10: { value: "#fdf2e0" },
+        20: { value: "#fbe5c0" },
+        40: { value: "#f5c980" },
+        60: { value: "#efa840" },
+        80: { value: "#c94a20" }, // Base brand color
+        90: { value: "#a03b1a" }, // Hover state
+        100: { value: "#782c13" },
+      },
+    },
+    components: {
+      button: {
+        primary: {
+          backgroundColor: { value: "{colors.primary.80}" },
+          _hover: { backgroundColor: { value: "{colors.primary.90}" } },
+        },
+      },
+    },
+  },
+};
 
 export default function FindMeCamera({ eventId }: { eventId: string }) {
-  const webcamRef = useRef<Webcam>(null);
   const router = useRouter();
-  const [status, setStatus] = useState<
-    "idle" | "scanning" | "matching" | "success"
-  >("idle");
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const capture = useCallback(async () => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    if (!imageSrc) {
-      toast.error("Camera Error", {
-        description: "Failed to capture image. Check permissions.",
-      });
-      return;
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchSession() {
+      try {
+        const res = await fetch(`/api/events/${eventId}/liveness/create`, {
+          method: "POST",
+        });
+        const data = await res.json();
+
+        // Slight artificial delay so the user sees the cool boot sequence
+        setTimeout(() => {
+          if (isMounted && data.sessionId) setSessionId(data.sessionId);
+        }, 1200);
+      } catch (err) {
+        toast.error("Failed to initialize security protocol.");
+      }
     }
+    fetchSession();
+    return () => {
+      isMounted = false;
+    };
+  }, [eventId]);
 
-    setStatus("scanning");
+  const handleAnalysisComplete = useCallback(async () => {
+    if (!sessionId) return;
+    const toastId = toast.loading("Vault Engine: Verifying Biometrics...");
 
     try {
-      // Fake delay for cinematic dramatic effect
-      await new Promise((r) => setTimeout(r, 800));
-      setStatus("matching");
-
       const res = await fetch(`/api/events/${eventId}/find-me`, {
         method: "POST",
-        body: JSON.stringify({ imageBase64: imageSrc }),
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
       });
 
       const data = await res.json();
 
-      if (res.ok) {
-        const personId =
-          data.personId || data.photos?.[0]?.faceDetections?.[0]?.personId;
-        if (personId) {
-          setStatus("success");
-          toast.success("Identity Verified", {
-            description: "Routing to secure gallery...",
+      if (res.ok && data.personId) {
+        toast.success("Identity Verified", {
+          id: toastId,
+          description: "Routing to secure gallery...",
+        });
+        router.push(
+          `/guest/event/${eventId}/my-photos?personId=${data.personId}`,
+        );
+      } else {
+        if (res.status === 403 && data.error?.includes("BREACH")) {
+          toast.error("ACCESS DENIED", {
+            id: toastId,
+            description: "Spoofing attempt blocked & logged.",
           });
-          setTimeout(() => {
-            router.push(
-              `/guest/event/${eventId}/my-photos?personId=${personId}`,
-            );
-          }, 1200);
         } else {
-          setStatus("idle");
           toast.warning("Profile Not Indexed", {
-            description:
-              "We recognized a face, but you haven't been tagged in the vault yet. Try again later.",
+            id: toastId,
+            description: "You haven't been tagged in the vault yet.",
           });
         }
-      } else {
-        throw new Error(data.error || "Match failed");
+        setSessionId(null);
       }
     } catch (err) {
-      console.error(err);
-      setStatus("idle");
-      toast.error("Biometric Sync Failed", {
-        description: "Could not connect to the AWS resolution engine.",
-      });
+      toast.error("Network Error", { id: toastId });
+      setSessionId(null);
     }
-  }, [webcamRef, eventId, router]);
+  }, [sessionId, eventId, router]);
 
-  return (
-    <div className="flex flex-col items-center w-full space-y-8">
-      {/* Viewfinder Container */}
-      <div
-        className={cn(
-          "relative w-full max-w-sm aspect-[3/4] sm:aspect-square rounded-[32px] overflow-hidden bg-[#0d0d0f] transition-all duration-700",
-          status !== "idle"
-            ? "scale-[0.96] shadow-[0_0_50px_rgba(201,74,32,0.25)] border-[#c94a20]/30"
-            : "scale-100 shadow-2xl border-white/10",
-          "border",
-        )}
-      >
-        <Webcam
-          audio={false}
-          ref={webcamRef}
-          screenshotFormat="image/jpeg"
-          screenshotQuality={1} // Force 100% quality JPEG, no compression
-          videoConstraints={{
-            facingMode: "user",
-            width: { ideal: 1280 }, // Force HD capture
-            height: { ideal: 720 },
-          }}
-          className={cn(
-            "w-full h-full object-cover transition-all duration-700",
-            status !== "idle"
-              ? "grayscale-[0.8] contrast-150 brightness-75 scale-105"
-              : "grayscale-[0.2] contrast-110 scale-100",
-          )}
+  // 🚀 CINEMATIC LOADING STATE
+  if (!sessionId) {
+    return (
+      <div className="w-full max-w-sm mx-auto aspect-[3/4] sm:aspect-square bg-[#0d0d0f] rounded-[32px] border border-white/10 shadow-[0_0_50px_rgba(201,74,32,0.15)] flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Ambient Glow */}
+        <div className="absolute w-48 h-48 bg-[#c94a20]/20 rounded-full blur-[50px] animate-pulse" />
+
+        {/* Scanning Line */}
+        <motion.div
+          animate={{ y: ["-100%", "400%"] }}
+          transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+          className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-transparent via-[#c94a20]/20 to-transparent z-0"
         />
 
-        {status === "idle" && (
-          <div className="absolute inset-0 z-10 pointer-events-none flex flex-col items-center justify-center">
-            <div className="w-[65%] aspect-[3/4] rounded-[100%] border-2 border-white/30 border-dashed animate-[pulse_3s_ease-in-out_infinite]" />
-            <p className="absolute bottom-12 text-white/50 text-[10px] font-mono uppercase tracking-widest bg-black/40 px-3 py-1 rounded-full backdrop-blur-md">
-              Align Face Within Oval
-            </p>
-          </div>
-        )}
-
-        {/* Viewfinder Tactical Brackets */}
-        <div
-          className={cn(
-            "absolute inset-6 pointer-events-none z-10 flex flex-col justify-between transition-opacity duration-500",
-            status === "idle" ? "opacity-50" : "opacity-10",
-          )}
-        >
-          <div className="flex justify-between">
-            <div className="w-10 h-10 border-t-2 border-l-2 border-white rounded-tl-2xl" />
-            <div className="w-10 h-10 border-t-2 border-r-2 border-white rounded-tr-2xl" />
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="relative mb-6">
+            <div className="absolute inset-0 border border-[#c94a20]/50 rounded-full animate-ping" />
+            <div className="w-16 h-16 bg-[#c94a20]/10 border border-[#c94a20]/30 rounded-full flex items-center justify-center backdrop-blur-md">
+              <ScanFace className="w-8 h-8 text-[#c94a20]" />
+            </div>
           </div>
 
-          {/* Center Crosshair (Only visible when idle) */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-30">
-            <Focus size={48} className="text-white" strokeWidth={1} />
+          <h3 className="text-white font-serif text-lg font-bold tracking-tight mb-2">
+            Establishing Uplink
+          </h3>
+
+          <div className="flex items-center gap-2 text-[10px] font-mono text-[#5a5a64] uppercase tracking-widest mb-6">
+            <Loader2 className="w-3 h-3 animate-spin text-[#c94a20]" />
+            Provisioning AWS Session...
           </div>
 
-          <div className="flex justify-between">
-            <div className="w-10 h-10 border-b-2 border-l-2 border-white rounded-bl-2xl" />
-            <div className="w-10 h-10 border-b-2 border-r-2 border-white rounded-br-2xl" />
+          <div className="flex gap-1">
+            {[...Array(3)].map((_, i) => (
+              <motion.div
+                key={i}
+                animate={{ opacity: [0.2, 1, 0.2] }}
+                transition={{ repeat: Infinity, duration: 1, delay: i * 0.2 }}
+                className="w-1.5 h-1.5 bg-[#c94a20] rounded-full"
+              />
+            ))}
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Scanning Overlays */}
-        <AnimatePresence>
-          {status !== "idle" && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-20"
-            >
-              {/* Red Tint */}
-              <div className="absolute inset-0 bg-[#c94a20]/10 mix-blend-overlay" />
-
-              {/* Framer Motion Scanline */}
-              <motion.div
-                animate={{ y: ["-100%", "400%"] }}
-                transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-transparent via-[#c94a20]/50 to-transparent z-30"
-              />
-
-              {/* Centered Status HUD */}
-              <div className="absolute inset-0 flex items-center justify-center z-40">
-                <div className="bg-black/60 backdrop-blur-xl border border-[#c94a20]/40 px-8 py-6 rounded-[24px] flex flex-col items-center gap-4 shadow-2xl">
-                  {status === "success" ? (
-                    <ScanFace className="w-10 h-10 text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]" />
-                  ) : (
-                    <Loader2 className="w-10 h-10 text-[#c94a20] animate-spin" />
-                  )}
-                  <div className="text-center">
-                    <span className="text-white text-[11px] font-mono font-bold tracking-widest block uppercase">
-                      {status === "scanning"
-                        ? "Analyzing Vectors"
-                        : status === "matching"
-                          ? "Querying Vault"
-                          : "Identity Verified"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+  return (
+    <div className="w-full max-w-sm mx-auto relative group">
+      {/* 🚀 TACTICAL CORNER BRACKETS (Overlays on top of the camera) */}
+      <div className="absolute inset-4 pointer-events-none z-10 flex flex-col justify-between transition-opacity duration-1000 opacity-30 group-hover:opacity-60">
+        <div className="flex justify-between">
+          <div className="w-8 h-8 border-t-2 border-l-2 border-[#c94a20] rounded-tl-2xl" />
+          <div className="w-8 h-8 border-t-2 border-r-2 border-[#c94a20] rounded-tr-2xl" />
+        </div>
+        <div className="flex justify-between items-center px-2">
+          <div className="text-[8px] font-mono text-[#c94a20] uppercase tracking-[0.3em] rotate-[-90deg] origin-left translate-y-8">
+            AWS_LIVENESS_V2
+          </div>
+          <div className="text-[8px] font-mono text-[#c94a20] uppercase tracking-[0.3em] rotate-[90deg] origin-right translate-y-8">
+            AES_256_ENCRYPTED
+          </div>
+        </div>
+        <div className="flex justify-between">
+          <div className="w-8 h-8 border-b-2 border-l-2 border-[#c94a20] rounded-bl-2xl" />
+          <div className="w-8 h-8 border-b-2 border-r-2 border-[#c94a20] rounded-br-2xl" />
+        </div>
       </div>
 
-      {/* Action Button */}
-      <div className="w-full max-w-sm space-y-4">
-        <button
-          onClick={capture}
-          disabled={status !== "idle"}
-          className={cn(
-            "group w-full py-5 rounded-[20px] font-bold transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden shadow-xl",
-            status !== "idle"
-              ? "bg-white/5 text-white/30 cursor-wait border border-white/5"
-              : "bg-white text-black hover:bg-[#c94a20] hover:text-white active:scale-95 hover:shadow-[0_0_30px_rgba(201,74,32,0.3)]",
-          )}
-        >
-          {status !== "idle" ? (
-            <span className="text-[11px] uppercase tracking-widest font-mono">
-              Processing Sequence...
-            </span>
-          ) : (
-            <>
-              <Camera
-                size={20}
-                className="transition-transform group-hover:scale-110"
-              />
-              <span className="text-[13px] uppercase tracking-widest">
-                Initiate Scan
-              </span>
-              <Sparkles
-                size={16}
-                className="text-[#c94a20] group-hover:text-white transition-colors"
-              />
-            </>
-          )}
-        </button>
+      {/* 🚀 AWS LIVENESS DETECTOR */}
+      <div className="rounded-[32px] overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(201,74,32,0.15)] relative bg-[#0d0d0f] h-[600px] sm:h-[650px] w-full flex flex-col">
+        <ThemeProvider theme={vaultTheme} colorMode="dark">
+          <FaceLivenessDetector
+            sessionId={sessionId}
+            region={process.env.NEXT_PUBLIC_AWS_REGION || "ap-south-1"}
+            onAnalysisComplete={handleAnalysisComplete}
+            disableStartScreen={false}
+            onUserCancel={() => setSessionId(null)}
+          />
+        </ThemeProvider>
+      </div>
 
-        <p className="text-[9px] text-white/30 uppercase font-mono tracking-widest text-center flex items-center justify-center gap-1.5">
-          <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
-          Encrypted by AWS Rekognition
-        </p>
+      {/* Trust Badges */}
+      <div className="mt-6 flex justify-center items-center gap-4 text-[9px] font-mono text-white/30 uppercase tracking-[0.2em]">
+        <span className="flex items-center gap-1.5">
+          <ShieldCheck size={12} className="text-green-500" /> Secure Frame
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Fingerprint size={12} className="text-[#c94a20]" /> Zero-Trust
+        </span>
       </div>
     </div>
   );

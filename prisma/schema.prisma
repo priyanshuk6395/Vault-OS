@@ -20,6 +20,7 @@ model Event {
   // Relations
   assets            Asset[]  
   persons           Person[]
+  accessLogs        AccessLog[] // <-- ADDED: Links the audit trail to the specific Vault
 }
 
 model Asset {
@@ -34,8 +35,8 @@ model Asset {
   status          String    @default("PENDING") 
   moderationState String    @default("PENDING") 
 
-  mimeType        String?   // Added to fix previous Prisma error
-  fileSize        Int?      // Added to fix previous Prisma error
+  mimeType        String?   
+  fileSize        Int?      
 
   uploaderId      String?
   
@@ -69,7 +70,7 @@ model FaceDetection {
   asset           Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
   personId        String
   person          Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  createdAt       DateTime @default(now())
   
   // AWS Rekognition Data
   faceId          String   @unique // The ID from Rekognition
@@ -91,4 +92,21 @@ model FaceSample {
   createdAt       DateTime      @default(now())
 
   @@unique([personId, faceDetectionId])
+}
+
+// ==========================================
+// NEW: SYSTEM TELEMETRY & AUDIT TRAIL
+// ==========================================
+
+model AccessLog {
+  id          String   @id @default(uuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  action      String   @default("ACCESS_GRANTED")
+  userName    String?  @default("Anonymous")
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
 }

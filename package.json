@@ -9,14 +9,18 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-amplify/ui-react": "^6.15.4",
+    "@aws-amplify/ui-react-liveness": "^3.6.6",
     "@aws-sdk/client-rekognition": "^3.1031.0",
     "@aws-sdk/client-s3": "^3.1031.0",
     "@aws-sdk/s3-request-presigner": "^3.1031.0",
     "@prisma/client": "^6.19.3",
     "archiver": "^7.0.1",
+    "aws-amplify": "^6.17.0",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
     "framer-motion": "^12.38.0",
     "heic2any": "^0.0.4",
     "lucide-react": "^1.8.0",

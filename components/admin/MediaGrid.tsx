@@ -11,23 +11,48 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
+  Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 // --- Sub-component for individual grid images ---
-function AdminGridItem({ asset, onClick, onDelete, isDeleting }: any) {
+function AdminGridItem({ asset, onClick, onDelete, isDeleting, isEditing, isSelected, onSelect }: any) {
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isEditing) {
+      e.stopPropagation();
+      onSelect(asset.id);
+    } else {
+      onClick();
+    }
+  };
 
   return (
     <motion.div
       layoutId={`admin-asset-${asset.id}`}
       whileHover={{ y: -4 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      onClick={onClick}
-      className="group bg-white border border-[#dbd8cf] rounded-2xl overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-[#c94a20]/10 transition-all relative flex flex-col"
+      onClick={handleClick}
+      className={cn(
+        "group bg-white border rounded-2xl overflow-hidden cursor-pointer transition-all relative flex flex-col",
+        isSelected ? "border-[#c94a20] shadow-[0_0_0_2px_#c94a20] scale-[0.98]" : "border-[#dbd8cf] hover:shadow-xl hover:shadow-[#c94a20]/10"
+      )}
     >
       <div className="aspect-[4/3] bg-[#eceae4] relative flex items-center justify-center overflow-hidden">
+        
+        {/* Bulk Select Overlay Checkbox */}
+        {isEditing && (
+          <div className="absolute top-3 left-3 z-40">
+            <div className={cn(
+              "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300", 
+              isSelected ? "bg-[#c94a20] border-[#c94a20] text-white" : "bg-black/30 border-white/70 backdrop-blur-sm"
+            )}>
+              {isSelected && <Check size={14} strokeWidth={3} />}
+            </div>
+          </div>
+        )}
         {/* Loading Skeleton */}
         {!isLoaded && asset.url && (
           <div className="absolute inset-0 bg-gradient-to-br from-[#f5f4f0] to-[#eceae4] flex items-center justify-center animate-pulse z-0">
@@ -103,9 +128,15 @@ function AdminGridItem({ asset, onClick, onDelete, isDeleting }: any) {
 export default function MediaGrid({
   assets,
   onDelete,
+  isEditing,
+  selectedIds,
+  onSelect
 }: {
   assets: any[];
   onDelete: (id: string) => Promise<void>;
+  isEditing?: boolean;
+  selectedIds?: Set<string>;
+  onSelect?: (id: string) => void;
 }) {
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -163,6 +194,9 @@ export default function MediaGrid({
             key={asset.id} 
             asset={asset} 
             isDeleting={isDeleting === asset.id}
+            isEditing={isEditing}
+            isSelected={selectedIds?.has(asset.id)}
+            onSelect={onSelect}
             onClick={() => {
               setLightboxLoaded(false);
               setDirection(0); // Reset direction on first open
