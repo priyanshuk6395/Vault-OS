@@ -16,6 +16,7 @@ model Event {
   biometricSearch   Boolean  @default(true)
   publicGallery     Boolean  @default(false)
   createdAt         DateTime @default(now())
+  themeImageUrl String?
 
   // Relations
   assets            Asset[]  

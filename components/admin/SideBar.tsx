@@ -20,7 +20,13 @@ import { cn } from "@/lib/utils";
 import EventSwitcher from "./EventSwitcher";
 import { signOut } from "next-auth/react";
 
-export default function SideBar() {
+interface SideBarProps {
+  // Optional: only the mobile slide-out wrapper in layout.tsx passes this,
+  // so nav links can close the menu on tap. Desktop renders SideBar with no props.
+  onClose?: () => void;
+}
+
+export default function SideBar({ onClose }: SideBarProps) {
   const pathname = usePathname();
   const params = useParams();
   const eventId = params.eventId as string;
@@ -119,6 +125,7 @@ export default function SideBar() {
             <Link
               key={item.href}
               href={item.href!}
+              onClick={onClose}
               className={cn(
                 "flex items-center gap-[9px] px-[18px] py-[8px] text-[12.5px] transition-all border-l-2 border-transparent hover:bg-white/5 hover:text-white/80",
                 pathname === item.href &&
@@ -147,6 +154,7 @@ export default function SideBar() {
       <div className="p-4 border-t border-white/10 space-y-1 bg-white/[0.02] shrink-0">
         <Link
           href="/admin"
+          onClick={onClose}
           className="flex items-center gap-3 px-3 py-2.5 text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/5 rounded-xl transition-all group"
         >
           <div className="p-1.5 rounded-md bg-white/5 group-hover:bg-white/10 transition-colors">

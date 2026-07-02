@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, Sparkles, ShieldCheck } from "lucide-react";
+import { Portal } from "@/components/ui/Portal";
 
 export default function CreateEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
   const [name, setName] = useState("");
@@ -25,6 +26,7 @@ export default function CreateEventModal({ isOpen, onClose }: { isOpen: boolean,
   if (!isOpen) return null;
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-[#0e0e0f] border border-white/10 w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
         <div className="flex justify-between items-center mb-6">
@@ -72,5 +74,6 @@ export default function CreateEventModal({ isOpen, onClose }: { isOpen: boolean,
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

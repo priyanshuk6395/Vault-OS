@@ -3,11 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, X, Maximize2, Loader2, ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
+import {
+  Download,
+  X,
+  Maximize2,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Image as ImageIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // --- Sub-component for individual images ---
-function GridItem({ photo, onClick }: { photo: any, onClick: () => void }) {
+function GridItem({ photo, onClick }: { photo: any; onClick: () => void }) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   return (
@@ -21,7 +29,9 @@ function GridItem({ photo, onClick }: { photo: any, onClick: () => void }) {
       {!isLoaded && (
         <div className="absolute inset-0 bg-[#1a1a1c] flex flex-col items-center justify-center min-h-[300px]">
           <Loader2 className="w-6 h-6 text-[#c94a20] animate-spin mb-2" />
-          <span className="text-[9px] font-mono text-white/20 uppercase tracking-[0.2em]">Decrypting...</span>
+          <span className="text-[9px] font-mono text-white/20 uppercase tracking-[0.2em]">
+            Decrypting...
+          </span>
         </div>
       )}
 
@@ -33,21 +43,23 @@ function GridItem({ photo, onClick }: { photo: any, onClick: () => void }) {
         onLoad={() => setIsLoaded(true)}
         className={cn(
           "w-full h-auto object-cover transition-all duration-1000 ease-out will-change-transform",
-          isLoaded ? "opacity-100 blur-0 scale-100" : "opacity-0 blur-2xl scale-110",
-          "group-hover:scale-105"
+          isLoaded
+            ? "opacity-100 blur-0 scale-100"
+            : "opacity-0 blur-2xl scale-110",
+          "group-hover:scale-105",
         )}
       />
 
       {/* Action Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-4">
-         <div className="flex items-center justify-between w-full">
-            <span className="text-[10px] font-mono text-white/60 truncate max-w-[120px]">
-               {photo.sourceFilename?.split('.')[0]}
-            </span>
-            <div className="p-2 bg-white/10 rounded-full backdrop-blur-md border border-white/20">
-               <Maximize2 size={14} className="text-white" />
-            </div>
-         </div>
+        <div className="flex items-center justify-between w-full">
+          <span className="text-[10px] font-mono text-white/60 truncate max-w-[120px]">
+            {photo.sourceFilename?.split(".")[0]}
+          </span>
+          <div className="p-2 bg-white/10 rounded-full backdrop-blur-md border border-white/20">
+            <Maximize2 size={14} className="text-white" />
+          </div>
+        </div>
       </div>
     </motion.div>
   );
@@ -60,9 +72,11 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
   const [mounted, setMounted] = useState(false);
   const [direction, setDirection] = useState(0); // -1 for left, 1 for right
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const currentIndex = photos.findIndex(p => p.id === selectedPhoto?.id);
+  const currentIndex = photos.findIndex((p) => p.id === selectedPhoto?.id);
   const hasNext = currentIndex >= 0 && currentIndex < photos.length - 1;
   const hasPrev = currentIndex > 0;
 
@@ -100,12 +114,38 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedPhoto, closeLightbox, handleNext, handlePrev]);
 
-  const handleDownload = async (storageKey: string) => {
+  const handleDownload = async (
+    storageKey: string,
+    originalFilename?: string,
+  ) => {
     try {
+      // 1. Get the pre-signed URL from your backend
       const res = await fetch(`/api/upload/download-url?key=${storageKey}`);
       const { url } = await res.json();
-      window.open(url, "_blank");
-    } catch (err) { console.error(err); }
+
+      // 2. Fetch the file into the browser's local memory (Blob)
+      // This is the magic step that bypasses AWS cross-origin naming blocks
+      const imageResponse = await fetch(url);
+      const blob = await imageResponse.blob();
+      const localBlobUrl = window.URL.createObjectURL(blob);
+
+      // 3. Determine the name (use provided name, or extract from key)
+      const downloadName =
+        originalFilename || storageKey.split("/").pop() || "vault_asset.jpg";
+
+      // 4. Create an invisible link and strictly force the download
+      const link = document.createElement("a");
+      link.href = localBlobUrl;
+      link.download = downloadName;
+      document.body.appendChild(link);
+      link.click();
+
+      // 5. Clean up the DOM and Memory
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(localBlobUrl);
+    } catch (err) {
+      console.error("Download failed:", err);
+    }
   };
 
   const lightboxContent = (
@@ -124,12 +164,24 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
           {/* Nav Buttons (Desktop) */}
           <div className="hidden md:contents">
             {hasPrev && (
-              <button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="absolute left-8 z-[100] p-5 bg-white/5 hover:bg-white/10 text-white rounded-full border border-white/10 transition-all hover:scale-110 active:scale-95 group">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrev();
+                }}
+                className="absolute left-8 z-[100] p-5 bg-white/5 hover:bg-white/10 text-white rounded-full border border-white/10 transition-all hover:scale-110 active:scale-95 group"
+              >
                 <ChevronLeft size={32} />
               </button>
             )}
             {hasNext && (
-              <button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="absolute right-8 z-[100] p-5 bg-white/5 hover:bg-white/10 text-white rounded-full border border-white/10 transition-all hover:scale-110 active:scale-95 group">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNext();
+                }}
+                className="absolute right-8 z-[100] p-5 bg-white/5 hover:bg-white/10 text-white rounded-full border border-white/10 transition-all hover:scale-110 active:scale-95 group"
+              >
                 <ChevronRight size={32} />
               </button>
             )}
@@ -151,10 +203,12 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
             }}
             className="relative z-10 w-full h-full flex items-center justify-center p-4 cursor-grab active:cursor-grabbing"
           >
-             {!lightboxLoaded && (
+            {!lightboxLoaded && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                 <Loader2 className="w-10 h-10 text-[#c94a20] animate-spin" />
-                <span className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em]">Enhancing...</span>
+                <span className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em]">
+                  Enhancing...
+                </span>
               </div>
             )}
             <img
@@ -163,7 +217,7 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
               onLoad={() => setLightboxLoaded(true)}
               className={cn(
                 "max-w-[95vw] max-h-[80vh] object-contain rounded-xl shadow-2xl transition-all duration-500",
-                lightboxLoaded ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                lightboxLoaded ? "opacity-100 scale-100" : "opacity-0 scale-95",
               )}
               draggable={false}
             />
@@ -172,22 +226,25 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
           {/* Footer Controls */}
           <div className="absolute bottom-10 left-0 w-full px-6 flex flex-col items-center gap-6 z-[100] pointer-events-none">
             <div className="flex items-center gap-4 pointer-events-auto">
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDownload(selectedPhoto.storageKey); }}
-                  className="flex items-center gap-3 px-8 py-4 bg-white text-black rounded-full font-bold uppercase tracking-widest text-[11px] transition-all hover:bg-[#c94a20] hover:text-white shadow-2xl active:scale-95"
-                >
-                  <Download size={18} /> Save Memory
-                </button>
-                <button
-                  onClick={closeLightbox}
-                  className="p-4 bg-white/10 text-white rounded-full hover:bg-red-500 transition-all border border-white/10 backdrop-blur-xl active:scale-95"
-                >
-                  <X size={20} />
-                </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownload(selectedPhoto.storageKey, selectedPhoto.sourceFilename);
+                }}
+                className="flex items-center gap-3 px-8 py-4 bg-white text-black rounded-full font-bold uppercase tracking-widest text-[11px] transition-all hover:bg-[#c94a20] hover:text-white shadow-2xl active:scale-95"
+              >
+                <Download size={18} /> Save Memory
+              </button>
+              <button
+                onClick={closeLightbox}
+                className="p-4 bg-white/10 text-white rounded-full hover:bg-red-500 transition-all border border-white/10 backdrop-blur-xl active:scale-95"
+              >
+                <X size={20} />
+              </button>
             </div>
-            
+
             <div className="px-4 py-2 bg-white/5 backdrop-blur-md rounded-full border border-white/10 text-white/40 text-[10px] font-mono uppercase tracking-[0.2em]">
-               Index: {currentIndex + 1} / {photos.length}
+              Index: {currentIndex + 1} / {photos.length}
             </div>
           </div>
         </div>
@@ -199,7 +256,11 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
     <div className="pb-20">
       <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6">
         {photos.map((photo) => (
-          <GridItem key={photo.id} photo={photo} onClick={() => setSelectedPhoto(photo)} />
+          <GridItem
+            key={photo.id}
+            photo={photo}
+            onClick={() => setSelectedPhoto(photo)}
+          />
         ))}
       </div>
       {mounted && createPortal(lightboxContent, document.body)}

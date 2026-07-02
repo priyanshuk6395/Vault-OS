@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { UserCircle2, Loader2, Check, Search, Fingerprint, XCircle, ArrowUpDown, X, ScanFace, Activity, ShieldAlert, Trash2 } from "lucide-react";
+import { UserCircle2, Loader2, Check, Search, Fingerprint, XCircle, ArrowUpDown, X, ScanFace, Activity, ShieldAlert, Trash2, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ export default function PeopleGallery({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   
   // Inspector State
   const [inspectedPerson, setInspectedPerson] = useState<any | null>(null);
@@ -359,7 +360,29 @@ export default function PeopleGallery({
               </div>
 
               {/* Danger Zone */}
-              <div className="p-6 border-t border-white/10 bg-black/20 shrink-0">
+{/* Action Zone */}
+              <div className="p-6 border-t border-white/10 bg-black/20 shrink-0 space-y-3">
+                
+                {/* 🚀 NEW: Download Button */}
+                <button 
+                  onClick={() => {
+                    setDownloadingId(inspectedPerson.id);
+                    window.location.href = `/api/events/${inspectedPerson.eventId}/download-all?personId=${inspectedPerson.id}`;
+                    // Cinematic delay to let the stream initialize before resetting the button
+                    setTimeout(() => setDownloadingId(null), 3000);
+                  }}
+                  disabled={downloadingId === inspectedPerson.id || inspectedPerson._count.faceDetections === 0}
+                  className="w-full py-3.5 bg-white/10 hover:bg-white border border-white/20 text-white hover:text-black font-bold text-[11px] font-mono uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                >
+                  {downloadingId === inspectedPerson.id ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
+                  )}
+                  {downloadingId === inspectedPerson.id ? "Packing Archive..." : `Download Assets (${inspectedPerson._count.faceDetections})`}
+                </button>
+
+                {/* Existing Purge Button */}
                 <button 
                   onClick={() => {
                     toast.error("Purge Protocol Required", { description: "You must run a global purge to remove false identities." });

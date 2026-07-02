@@ -59,7 +59,7 @@ useEffect(() => {
         {!isMainDashboard && (
           <div
             className={cn(
-              "fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] lg:hidden transition-all duration-300",
+              "fixed inset-0 bg-black/60 backdrop-blur-sm lg:hidden transition-all duration-300",
               isMobileMenuOpen
                 ? "opacity-100 pointer-events-auto"
                 : "opacity-0 pointer-events-none",
@@ -72,11 +72,11 @@ useEffect(() => {
         {!isMainDashboard && (
           <div
             className={cn(
-              "fixed inset-y-0 left-0 z-[50] w-[224px] shrink-0 transform transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] lg:relative lg:translate-x-0 shadow-2xl lg:shadow-none",
+              "fixed inset-y-0 left-0 w-[224px] shrink-0 transform transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] lg:relative lg:translate-x-0 shadow-2xl lg:shadow-none z-50",
               isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
             )}
           >
-            <SideBar />
+            <SideBar onClose={() => setIsMobileMenuOpen(false)}/>
 
             {/* Mobile Close Button - Hides seamlessly when menu is closed */}
             <button
