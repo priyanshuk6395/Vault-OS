@@ -40,23 +40,23 @@ export default function EventSwitcher() {
 
   return (
     <>
-      <div className="relative px-3 py-4 border-b border-white/5" ref={dropdownRef}>
+      <div className="relative px-3 py-4 border-b border-border" ref={dropdownRef}>
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             "w-full flex items-center justify-between p-3 rounded-xl transition-all duration-300 group",
-            isOpen ? "bg-white/10 ring-1 ring-white/10" : "bg-white/5 hover:bg-white/10"
+            isOpen ? "bg-subtle ring-1 ring-border" : "bg-background hover:bg-subtle"
           )}
         >
           <div className="flex items-center gap-3 truncate">
-            <div className="w-7 h-7 bg-[#c94a20] rounded-lg flex items-center justify-center text-white shadow-lg shadow-[#c94a20]/20 shrink-0">
+            <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 shrink-0">
               <Command size={14} />
             </div>
             <div className="text-left truncate">
-              <div className="text-[9px] font-mono text-white/30 uppercase tracking-[0.1em] leading-none mb-1">
+              <div className="text-[9px] font-mono text-muted-foreground uppercase tracking-[0.1em] leading-none mb-1">
                 Active Vault
               </div>
-              <div className="text-[12.5px] font-bold text-white group-hover:text-white transition-colors truncate leading-none">
+              <div className="text-[12.5px] font-bold text-foreground group-hover:text-foreground transition-colors truncate leading-none">
                 {activeEvent?.title || "Select Event"}
               </div>
             </div>
@@ -64,17 +64,17 @@ export default function EventSwitcher() {
           <ChevronDown
             size={14}
             className={cn(
-              "text-white/20 transition-transform duration-300 ease-in-out shrink-0",
-              isOpen ? "rotate-180 text-white" : "group-hover:text-white/50"
+              "text-muted-foreground transition-transform duration-300 ease-in-out shrink-0",
+              isOpen ? "rotate-180 text-foreground" : "group-hover:text-foreground"
             )}
           />
         </button>
 
         {/* --- DROPDOWN MENU --- */}
         {isOpen && (
-          <div className="absolute left-3 right-3 mt-2 bg-[#161618] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="absolute left-3 right-3 mt-2 bg-popover text-popover-foreground border border-border rounded-lg shadow-xl z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="max-h-[280px] overflow-y-auto py-2 custom-scrollbar">
-              <div className="px-3 py-2 text-[9px] font-mono text-white/20 uppercase tracking-widest border-b border-white/5 mb-1">
+              <div className="px-3 py-2 text-[9px] font-mono text-muted-foreground uppercase tracking-widest border-b border-border mb-1">
                 Your Vaults
               </div>
               {events.map((event) => (
@@ -87,8 +87,8 @@ export default function EventSwitcher() {
                   className={cn(
                     "w-full px-4 py-2.5 text-left text-[12.5px] flex items-center justify-between group transition-all",
                     event.id === currentEventId 
-                      ? "text-[#c94a20] bg-[#c94a20]/5" 
-                      : "text-white/60 hover:bg-white/5 hover:text-white"
+                      ? "text-primary bg-primary/10" 
+                      : "text-muted-foreground hover:bg-subtle hover:text-foreground"
                   )}
                 >
                   <span className="truncate">{event.title}</span>
@@ -98,15 +98,15 @@ export default function EventSwitcher() {
             </div>
 
             {/* --- ACTION FOOTER --- */}
-            <div className="border-t border-white/5 bg-white/[0.02] p-1">
+            <div className="border-t border-border bg-subtle p-1">
               <button
                 onClick={() => {
                   setIsOpen(false);
                   setIsModalOpen(true);
                 }}
-                className="w-full px-3 py-2.5 rounded-xl text-[12px] text-white/80 hover:bg-[#c94a20] hover:text-white transition-all flex items-center gap-3 group"
+                className="w-full px-3 py-2.5 rounded-lg text-[12px] text-foreground hover:bg-primary hover:text-primary-foreground transition-all flex items-center gap-3 group"
               >
-                <div className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-white/20">
+                <div className="w-6 h-6 rounded-md bg-background flex items-center justify-center group-hover:bg-primary-foreground/20">
                   <Plus size={14} />
                 </div>
                 <span className="font-semibold">Create New Vault</span>

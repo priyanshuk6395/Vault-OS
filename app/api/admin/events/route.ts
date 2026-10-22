@@ -1,27 +1,27 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
+import { authOptions, eventOwnerIds } from "@/lib/auth";
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     // 1. SESSION & AUTHENTICATION
     // In production, we retrieve the user from the secure server-side session.
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const ownerId = session.user.id;
+    const ownerIds = eventOwnerIds(session.user.id);
 
     // 2. DATA ISOLATION & OPTIMIZED QUERY
     // We only select the fields needed for the switcher to minimize payload size.
     const events = await prisma.event.findMany({
       where: { 
-        ownerId: ownerId 
+        ownerId: { in: ownerIds }
       },
       select: { 
         id: true, 
         title: true, 
-        passcode: true,
         _count: {
           select: { assets: true } // Bonus: showing asset counts in the switcher
         }

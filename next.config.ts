@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   allowedDevOrigins: ['5a28-2409-40e5-bf-c41f-4032-33ce-4263-8fc4.ngrok-free.app'],
   images: {
     localPatterns: [

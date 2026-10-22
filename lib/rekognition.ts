@@ -1,4 +1,9 @@
-import { CreateCollectionCommand, ListCollectionsCommand } from "@aws-sdk/client-rekognition";
+import {
+  CreateCollectionCommand,
+  DeleteFacesCommand,
+  ListCollectionsCommand,
+  ListFacesCommand,
+} from "@aws-sdk/client-rekognition";
 import { rekognitionClient } from "./aws";
 
 /**
@@ -22,5 +27,45 @@ export async function initializeEventCollection(eventId: string) {
   } catch (error) {
     console.error("Rekognition Setup Error:", error);
     throw new Error("Failed to initialize face collection for event");
+  }
+}
+
+export async function deleteEventFacesForImage(eventId: string, externalImageIds: string | string[]) {
+  const collectionId = `event-${eventId}`;
+  const imageIds = new Set(Array.isArray(externalImageIds) ? externalImageIds : [externalImageIds]);
+  const faceIds: string[] = [];
+  let nextToken: string | undefined;
+
+  do {
+    let page;
+    try {
+      page = await rekognitionClient.send(new ListFacesCommand({
+        CollectionId: collectionId,
+        MaxResults: 1000,
+        NextToken: nextToken,
+      }));
+    } catch (error) {
+      if (error instanceof Error && error.name === "ResourceNotFoundException") return;
+      throw error;
+    }
+    faceIds.push(...(page.Faces ?? [])
+      .filter((face) => !!face.ExternalImageId && imageIds.has(face.ExternalImageId) && typeof face.FaceId === "string")
+      .map((face) => face.FaceId!));
+    nextToken = page.NextToken;
+  } while (nextToken);
+
+  await deleteEventFaceIds(eventId, faceIds);
+}
+
+export async function deleteEventFaceIds(eventId: string, faceIds: string[]) {
+  const collectionId = `event-${eventId}`;
+  for (let offset = 0; offset < faceIds.length; offset += 4000) {
+    const response = await rekognitionClient.send(new DeleteFacesCommand({
+      CollectionId: collectionId,
+      FaceIds: faceIds.slice(offset, offset + 4000),
+    }));
+    if (response.UnsuccessfulFaceDeletions?.length) {
+      throw new Error(`Failed to delete ${response.UnsuccessfulFaceDeletions.length} Rekognition face vectors.`);
+    }
   }
 }

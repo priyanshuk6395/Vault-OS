@@ -24,12 +24,12 @@ function GridItem({ photo, onClick }: { photo: any; onClick: () => void }) {
       onClick={onClick}
       whileHover={{ y: -4, scale: 1.01 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="relative group break-inside-avoid mb-6 rounded-[24px] overflow-hidden cursor-zoom-in bg-white/5 border border-white/10 shadow-xl hover:shadow-[#c94a20]/20 transition-all duration-500"
+      className="relative group break-inside-avoid mb-6 rounded-lg overflow-hidden cursor-zoom-in bg-card border border-border shadow-md hover:shadow-lg hover:shadow-primary/15 transition-all duration-500"
     >
       {!isLoaded && (
-        <div className="absolute inset-0 bg-[#1a1a1c] flex flex-col items-center justify-center min-h-[300px]">
-          <Loader2 className="w-6 h-6 text-[#c94a20] animate-spin mb-2" />
-          <span className="text-[9px] font-mono text-white/20 uppercase tracking-[0.2em]">
+        <div role="status" className="absolute inset-0 bg-subtle flex flex-col items-center justify-center min-h-[300px]">
+          <Loader2 className="w-6 h-6 text-primary animate-spin mb-2" />
+          <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-[0.2em]">
             Decrypting...
           </span>
         </div>
@@ -165,6 +165,7 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
           <div className="hidden md:contents">
             {hasPrev && (
               <button
+                aria-label="Save photo"
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePrev();
@@ -205,7 +206,7 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
           >
             {!lightboxLoaded && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                <Loader2 className="w-10 h-10 text-[#c94a20] animate-spin" />
+                <Loader2 className="w-10 h-10 text-accent-coral animate-spin" />
                 <span className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em]">
                   Enhancing...
                 </span>
@@ -231,7 +232,7 @@ export default function ImageGrid({ photos }: { photos: any[] }) {
                   e.stopPropagation();
                   handleDownload(selectedPhoto.storageKey, selectedPhoto.sourceFilename);
                 }}
-                className="flex items-center gap-3 px-8 py-4 bg-white text-black rounded-full font-bold uppercase tracking-widest text-[11px] transition-all hover:bg-[#c94a20] hover:text-white shadow-2xl active:scale-95"
+                className="flex items-center gap-3 px-8 py-4 bg-primary text-primary-foreground rounded-full font-bold uppercase tracking-widest text-[11px] transition-all hover:brightness-110 shadow-2xl active:scale-95"
               >
                 <Download size={18} /> Save Memory
               </button>

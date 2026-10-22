@@ -75,28 +75,28 @@ export default async function FaceReviewPage({
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
       
       {/* ENTERPRISE HEADER */}
-      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-[#dbd8cf] pb-6">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-border pb-6">
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <span className="px-2 py-1 bg-[#fdf2e0] text-[#a06010] border border-[#a06010]/20 text-[10px] font-mono rounded uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+            <span className="px-2 py-1 bg-accent-amber/10 text-accent-amber border border-accent-amber/20 text-[10px] font-mono rounded uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
               <Cpu size={12} /> Biometric Resolution Engine
             </span>
           </div>
-          <h2 className="text-[24px] sm:text-[28px] font-serif font-bold text-[#0e0e0f] tracking-tight flex items-center gap-3">
+          <h2 className="text-[24px] sm:text-[28px] font-serif font-bold text-foreground tracking-tight flex items-center gap-3">
             <span className="truncate max-w-[200px] sm:max-w-md md:max-w-lg">{event.title}</span>
-            <span className="text-[#dbd8cf] font-sans font-normal text-[22px] shrink-0">/</span> 
-            <span className="text-[#5a5a64] font-sans font-normal text-[22px] shrink-0">Face Review</span>
+            <span className="text-border font-sans font-normal text-[22px] shrink-0">/</span> 
+            <span className="text-muted-foreground font-sans font-normal text-[22px] shrink-0">Face Review</span>
           </h2>
-          <p className="text-[12px] sm:text-[13px] text-[#5a5a64] mt-1 font-medium">
+          <p className="text-[12px] sm:text-[13px] text-muted-foreground mt-1 font-medium">
             Train the AI by assigning identities to newly clustered biometric profiles.
           </p>
         </div>
 
         {/* Dynamic Counter HUD */}
         {filteredQueue.length > 0 && (
-          <div className="flex items-center gap-3 bg-white border border-[#dbd8cf] px-4 py-2.5 rounded-xl shadow-sm shrink-0">
-            <div className="w-2 h-2 rounded-full bg-[#a06010] animate-pulse" />
-            <span className="text-[11px] font-mono text-[#0e0e0f] uppercase tracking-widest font-bold">
+          <div className="flex items-center gap-3 bg-card border border-border px-4 py-2.5 rounded-lg shadow-sm shrink-0">
+            <div className="w-2 h-2 rounded-full bg-accent-amber animate-pulse" />
+            <span className="text-[11px] font-mono text-foreground uppercase tracking-widest font-bold">
               {filteredQueue.length} Entities Queued
             </span>
           </div>
@@ -105,17 +105,17 @@ export default async function FaceReviewPage({
 
       {/* DYNAMIC CONTENT AREA */}
       {filteredQueue.length > 0 ? (
-        <div className="bg-white border border-[#dbd8cf] rounded-[24px] sm:rounded-[32px] overflow-hidden min-h-[400px] shadow-sm p-4 sm:p-6">
+        <div className="bg-card border border-border rounded-xl overflow-hidden min-h-[400px] shadow-sm p-4 sm:p-6">
           <FaceReviewClient queue={filteredQueue} />
         </div>
       ) : (
-        <div className="text-center py-20 sm:py-32 bg-white border border-[#dbd8cf] border-dashed rounded-[24px] sm:rounded-[32px] shadow-sm">
-          <div className="w-16 h-16 bg-[#e6f5ee] text-[#2a7a4f] rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[#2a7a4f]/20">
+        <div className="text-center py-20 sm:py-32 bg-card border border-border border-dashed rounded-xl shadow-sm">
+          <div className="w-16 h-16 bg-accent-teal/10 text-accent-teal rounded-lg flex items-center justify-center mx-auto mb-4 border border-accent-teal/20">
             <CheckCircle2 size={32} />
           </div>
-          <p className="text-[#0e0e0f] text-[18px] sm:text-[20px] font-serif font-bold">Biometric Queue Clear</p>
-          <p className="text-[#5a5a64] text-[12px] sm:text-[13px] mt-1 mb-3">All detected faces have been successfully identified and merged.</p>
-          <p className="text-[#c8b89a] font-mono text-[10px] uppercase tracking-widest">AI Confidence is High</p>
+          <p className="text-foreground text-[18px] sm:text-[20px] font-serif font-bold">Biometric Queue Clear</p>
+          <p className="text-muted-foreground text-[12px] sm:text-[13px] mt-1 mb-3">All detected faces have been successfully identified and merged.</p>
+          <p className="text-accent-amber font-mono text-[10px] uppercase tracking-widest">AI Confidence is High</p>
         </div>
       )}
     </div>

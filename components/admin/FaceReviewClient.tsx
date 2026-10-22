@@ -64,16 +64,16 @@ export default function FaceReviewClient({ queue: initialQueue }: { queue: any[]
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }} 
         animate={{ opacity: 1, scale: 1 }}
-        className="text-center py-20 sm:py-32 bg-white border border-[#dbd8cf] rounded-[32px] shadow-sm max-w-2xl mx-auto"
+        className="text-center py-20 sm:py-32 bg-card border border-border rounded-xl shadow-sm max-w-2xl mx-auto"
       >
-        <div className="w-16 h-16 bg-[#e6f5ee] rounded-[20px] flex items-center justify-center mx-auto mb-6 border border-[#2a7a4f]/20">
-          <Check className="text-[#2a7a4f]" size={32} />
+        <div className="w-16 h-16 bg-accent-teal/10 rounded-lg flex items-center justify-center mx-auto mb-6 border border-accent-teal/20">
+          <Check className="text-accent-teal" size={32} />
         </div>
-        <h3 className="text-2xl font-serif font-bold text-[#0e0e0f]">Queue Cleared</h3>
-        <p className="text-sm text-[#5a5a64] mt-2">All biometric samples have been processed.</p>
+        <h3 className="text-2xl font-serif font-bold text-foreground">Queue Cleared</h3>
+        <p className="text-sm text-muted-foreground mt-2">All biometric samples have been processed.</p>
         <button 
           onClick={() => window.location.reload()} 
-          className="mt-8 px-8 py-3.5 bg-[#0e0e0f] text-white rounded-xl text-[11px] font-mono font-bold uppercase tracking-[0.2em] hover:bg-[#c94a20] hover:shadow-lg transition-all active:scale-95 flex items-center gap-2 mx-auto"
+          className="mt-8 px-8 py-3.5 bg-primary text-primary-foreground rounded-lg text-[11px] font-mono font-bold uppercase tracking-[0.2em] hover:brightness-110 hover:shadow-lg transition-all active:scale-95 flex items-center gap-2 mx-auto"
         >
           <ShieldAlert size={14} /> Reload Engine
         </button>
@@ -96,23 +96,23 @@ export default function FaceReviewClient({ queue: initialQueue }: { queue: any[]
       {/* SYSTEM STATUS HEADER */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end px-2 gap-4">
         <div className="space-y-1">
-          <span className="text-[10px] font-mono text-[#c94a20] uppercase tracking-[0.2em] font-bold flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#c94a20] animate-pulse" />
+          <span className="text-[10px] font-mono text-primary uppercase tracking-[0.2em] font-bold flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             Biometric Review Terminal
           </span>
           <h2 className="text-2xl sm:text-3xl font-serif font-bold tracking-tight">
-            Pending Identities <span className="text-[#dbd8cf] font-sans ml-2">/</span> <span className="text-[#c8b89a] ml-1">{queue.length - currentIndex}</span>
+            Pending Identities <span className="text-border font-sans ml-2">/</span> <span className="text-muted-foreground ml-1">{queue.length - currentIndex}</span>
           </h2>
         </div>
         
         <div className="text-left sm:text-right w-full sm:w-auto">
-          <div className="flex justify-between sm:justify-end gap-4 text-[10px] font-mono text-[#5a5a64] mb-2 uppercase tracking-widest font-bold">
+          <div className="flex justify-between sm:justify-end gap-4 text-[10px] font-mono text-muted-foreground mb-2 uppercase tracking-widest font-bold">
             <span>Engine Load</span>
             <span>{Math.round(progress)}%</span>
           </div>
-          <div className="w-full sm:w-32 h-1.5 bg-[#eceae4] rounded-full overflow-hidden">
+          <div className="w-full sm:w-32 h-1.5 bg-subtle rounded-full overflow-hidden">
              <motion.div 
-               className="h-full bg-[#c94a20]" 
+               className="h-full bg-primary"
                initial={{ width: 0 }}
                animate={{ width: `${progress}%` }}
                transition={{ ease: "easeInOut" }}
@@ -140,10 +140,10 @@ export default function FaceReviewClient({ queue: initialQueue }: { queue: any[]
               else if (offset.x < -100 || velocity.x < -500) handleAction('reject', 'left');
             }}
             
-            className="absolute inset-0 bg-white border border-[#dbd8cf] rounded-[32px] sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col cursor-grab active:cursor-grabbing"
+            className="absolute inset-0 bg-card text-card-foreground border border-border rounded-xl shadow-xl overflow-hidden flex flex-col cursor-grab active:cursor-grabbing"
           >
             {/* Image Area */}
-            <div className="relative flex-1 bg-[#0d0d0f] overflow-hidden group pointer-events-none">
+            <div className="relative flex-1 bg-background-elevated overflow-hidden group pointer-events-none">
               <motion.img 
                 key={showFullImage ? 'full' : 'crop'}
                 src={currentItem.faceUrl || face.asset.signedUrl}
@@ -168,7 +168,7 @@ export default function FaceReviewClient({ queue: initialQueue }: { queue: any[]
               </button>
 
               <div className="absolute top-4 sm:top-6 left-4 sm:left-6 flex gap-2">
-                <span className="px-3 py-1.5 bg-[#c94a20]/90 backdrop-blur-sm text-white text-[10px] font-mono rounded-full border border-white/10 shadow-lg flex items-center gap-2 uppercase tracking-widest">
+                <span className="px-3 py-1.5 bg-primary/90 backdrop-blur-sm text-primary-foreground text-[10px] font-mono rounded-full border border-primary-foreground/10 shadow-lg flex items-center gap-2 uppercase tracking-widest">
                   <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                   Match Conf: {Math.round(face.confidence)}%
                 </span>
@@ -176,11 +176,11 @@ export default function FaceReviewClient({ queue: initialQueue }: { queue: any[]
             </div>
 
             {/* ACTION CLUSTER */}
-            <div className="p-4 sm:p-8 bg-white shrink-0">
+              <div className="p-4 sm:p-8 bg-card shrink-0">
               <div className="flex justify-between items-start mb-4 sm:mb-6">
                 <div>
-                  <p className="text-[9px] sm:text-[10px] font-mono text-[#c8b89a] uppercase tracking-widest mb-1">Source Asset</p>
-                  <h3 className="text-base sm:text-lg font-serif font-bold text-[#0e0e0f] truncate max-w-[200px] sm:max-w-full">{face.asset.sourceFilename}</h3>
+                  <p className="text-[9px] sm:text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">Source Asset</p>
+                  <h3 className="text-base sm:text-lg font-serif font-bold text-card-foreground truncate max-w-[200px] sm:max-w-full">{face.asset.sourceFilename}</h3>
                 </div>
               </div>
 
@@ -188,9 +188,9 @@ export default function FaceReviewClient({ queue: initialQueue }: { queue: any[]
                 <button 
                   onClick={() => handleAction('reject', "left")}
                   disabled={isProcessing}
-                  className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-[20px] border border-[#dbd8cf] hover:border-red-200 hover:bg-red-50 hover:shadow-lg hover:shadow-red-500/10 transition-all active:scale-95 disabled:opacity-50"
+                  className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-lg border border-border hover:border-red-200 hover:bg-red-50 hover:shadow-lg hover:shadow-red-500/10 transition-all active:scale-95 disabled:opacity-50"
                 >
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#f5f4f0] group-hover:bg-red-500 group-hover:text-white flex items-center justify-center transition-all">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-subtle group-hover:bg-red-500 group-hover:text-white flex items-center justify-center transition-all">
                     <X size={18} />
                   </div>
                   <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest">Reject</span>
@@ -199,9 +199,9 @@ export default function FaceReviewClient({ queue: initialQueue }: { queue: any[]
                 <button 
                   onClick={() => handleAction('skip', "up")}
                   disabled={isProcessing}
-                  className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-[20px] border border-[#dbd8cf] hover:bg-[#f5f4f0] transition-all active:scale-95 disabled:opacity-50"
+                  className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-lg border border-border hover:bg-subtle transition-all active:scale-95 disabled:opacity-50"
                 >
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#f5f4f0] flex items-center justify-center group-hover:bg-white group-hover:shadow-sm">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-subtle flex items-center justify-center group-hover:bg-card group-hover:shadow-sm">
                     <SkipForward size={18} />
                   </div>
                   <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest">Skip</span>
@@ -210,9 +210,9 @@ export default function FaceReviewClient({ queue: initialQueue }: { queue: any[]
                 <button 
                   onClick={() => handleAction('confirm', "right")}
                   disabled={isProcessing}
-                  className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-[20px] bg-[#0e0e0f] text-white hover:bg-[#c94a20] transition-all shadow-xl shadow-black/10 active:scale-95 disabled:opacity-50"
+                  className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-lg bg-primary text-primary-foreground hover:brightness-110 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                 >
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary-foreground/10 flex items-center justify-center">
                     <Check size={18} />
                   </div>
                   <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest">Confirm</span>
@@ -224,14 +224,14 @@ export default function FaceReviewClient({ queue: initialQueue }: { queue: any[]
       </div>
 
       {/* FOOTER SHORTCUTS GUIDANCE (Desktop Only) */}
-      <div className="hidden sm:flex justify-center gap-8 text-[9px] font-mono text-[#c8b89a] uppercase tracking-widest">
-         <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-[#c94a20]" /> [A] / ⇾ Approve</span>
-         <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-[#5a5a64]" /> [R] / ⇽ Reject</span>
-         <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-[#dbd8cf]" /> [V] Toggle View</span>
+      <div className="hidden sm:flex justify-center gap-8 text-[9px] font-mono text-muted-foreground uppercase tracking-widest">
+         <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary" /> [A] / ⇾ Approve</span>
+         <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" /> [R] / ⇽ Reject</span>
+         <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-border" /> [V] Toggle View</span>
       </div>
       
       {/* Mobile Swipe Hint */}
-      <div className="sm:hidden text-center text-[10px] font-mono text-[#c8b89a] uppercase tracking-widest animate-pulse">
+      <div className="sm:hidden text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest animate-pulse">
         Swipe Left to Reject • Right to Approve
       </div>
     </div>

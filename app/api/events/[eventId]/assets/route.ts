@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { s3Client } from "@/lib/aws"; 
+import { getEventAuthorization } from "@/lib/guest-session";
 
 export async function GET(
   req: Request,
@@ -11,14 +12,16 @@ export async function GET(
   try {
     const { eventId } = await params;
 
-    // 1. Fetch Event to identify the Admin/Owner
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
-      select: { ownerId: true }
-    });
+    const { event, isOwner, isGuest } = await getEventAuthorization(eventId);
 
     if (!event) {
       return NextResponse.json({ error: 'Vault not found' }, { status: 404 });
+    }
+    if (!isOwner && !isGuest) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (isGuest && !event.publicGallery) {
+      return NextResponse.json({ error: "Public gallery is disabled for this vault." }, { status: 403 });
     }
 
     // 2. Fetch all Persons in this event to map Guest Uploaders
@@ -35,9 +38,8 @@ export async function GET(
     const assetsRaw = await prisma.asset.findMany({
       where: { 
         eventId,
-        // NOTE: If you want admins to see pending images in the main grid, remove this line!
-        // Otherwise, keep it so only approved ones show up here.
-        // moderationState: 'approved' 
+        ...(isGuest ? { moderationState: "approved" } : {}),
+        ...(isGuest ? { status: "processed" } : {}),
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -86,7 +88,9 @@ export async function GET(
       })
     );
 
-    return NextResponse.json(assets);
+    const response = NextResponse.json(assets);
+    response.headers.set("Cache-Control", "private, no-store, max-age=0");
+    return response;
   } catch (error) {
     console.error("Fetch Assets Error:", error);
     return NextResponse.json({ error: 'Failed to fetch assets' }, { status: 500 });

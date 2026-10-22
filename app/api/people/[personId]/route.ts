@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth'; // Adjust based on your auth setup
+import { getEventAuthorization } from '@/lib/guest-session';
 
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ personId: string }> }
 ) {
   try {
-    // 1. SECURITY CATCH
-    const session = await getServerSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized Node Access' }, { status: 401 });
-    }
-
     const { personId } = await params;
     const { name, status } = await req.json();
 
@@ -32,6 +26,9 @@ export async function PATCH(
     if (!currentPerson) {
       return NextResponse.json({ error: 'Entity not found in the index.' }, { status: 404 });
     }
+    const { event, isOwner } = await getEventAuthorization(currentPerson.eventId);
+    if (!event) return NextResponse.json({ error: 'Vault not found' }, { status: 404 });
+    if (!isOwner) return NextResponse.json({ error: 'Unauthorized Node Access' }, { status: 401 });
 
     // 3. THE COLLISION CHECK
     // Does someone with this exact name already exist in THIS specific vault?

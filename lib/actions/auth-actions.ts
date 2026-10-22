@@ -1,7 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
+import { issueGuestSessionCookie } from "@/lib/guest-session";
+import { migrateLegacyPasscodeIfCurrent, verifyEventPasscode } from "@/lib/passcode";
+import { finishPasscodeAttempt, getClientIp, reservePasscodeAttempt } from "@/lib/passcode-attempts";
 
 export async function verifyGuestAccess(eventId: string, passcode: string) {
   try {
@@ -9,20 +12,22 @@ export async function verifyGuestAccess(eventId: string, passcode: string) {
       where: { id: eventId },
       select: { passcode: true }
     });
+    const headersList = await headers();
+    const clientIp = getClientIp(headersList);
+    const attemptId = event ? await reservePasscodeAttempt(eventId, clientIp) : null;
+    if (event && !attemptId) return { success: false, rateLimited: true };
 
-    if (event && event.passcode === passcode.toUpperCase()) {
+    if (event && await verifyEventPasscode(passcode, event.passcode)) {
+      const passcodeSnapshot = await migrateLegacyPasscodeIfCurrent(eventId, passcode, event.passcode);
+      if (!passcodeSnapshot) {
+        await finishPasscodeAttempt(eventId, attemptId!, false, clientIp, headersList.get("user-agent") || "Unknown Device");
+        return { success: false };
+      }
+      await finishPasscodeAttempt(eventId, attemptId!, true, clientIp, headersList.get("user-agent") || "Unknown Device");
       // 1. Issue Security Clearance (Cookie)
-      const cookieStore = await cookies();
-      cookieStore.set(`event_auth_${eventId}`, "true", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24, // 24 hours
-        path: "/",
-      });
+      await issueGuestSessionCookie(eventId, undefined, passcodeSnapshot);
 
       // 2. Extract Telemetry Data natively via Next.js Headers
-      const headersList = await headers();
-      const ip = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || "127.0.0.1";
       const userAgent = headersList.get("user-agent") || "Unknown Device";
 
       // 3. Write Guest Identity to the Audit Trail
@@ -31,12 +36,15 @@ export async function verifyGuestAccess(eventId: string, passcode: string) {
           eventId,
           action: "ACCESS_GRANTED",
           userName: "Guest Participant", // <-- SECURING THE IDENTITY
-          ipAddress: ip.split(',')[0].trim(),
+          ipAddress: clientIp,
           userAgent,
         }
       });
 
       return { success: true };
+    }
+    if (event && attemptId) {
+      await finishPasscodeAttempt(eventId, attemptId, false, clientIp, headersList.get("user-agent") || "Unknown Device");
     }
     
     return { success: false };

@@ -1,15 +1,22 @@
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import { authOptions, eventOwnerIds } from "@/lib/auth";
 import AdminDashboardClient from "@/components/admin/AdminDashboardClient";
 import DashboardGreeting from "@/components/admin/DashboardGreeting";
 
 export default async function AdminDashboard() {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
   const events = await prisma.event.findMany({
-    include: {
+    where: { ownerId: { in: eventOwnerIds(session.user.id) } },
+    select: {
+      id: true,
+      title: true,
+      ownerId: true,
+      themeImageUrl: true,
+      createdAt: true,
       _count: { select: { assets: true, persons: true } }
     },
     orderBy: { createdAt: "desc" }

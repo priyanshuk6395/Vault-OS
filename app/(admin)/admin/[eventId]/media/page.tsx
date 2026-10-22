@@ -39,7 +39,7 @@ export default function MediaPage() {
     setRefreshKey((prev) => prev + 1);
     toast.success("Library Updated", {
       description: "New assets have been synced to the vault.",
-      icon: <Fingerprint className="w-4 h-4 text-[#c94a20]" />,
+      icon: <Fingerprint className="w-4 h-4 text-primary" />,
     });
   };
 
@@ -49,20 +49,20 @@ export default function MediaPage() {
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
       
       {/* 1. RESPONSIVE ENTERPRISE HEADER */}
-      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-[#dbd8cf] pb-6">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-border pb-6">
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <span className="px-2 py-1 bg-[#0e0e0f] text-white text-[10px] font-mono rounded uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+            <span className="px-2 py-1 bg-primary text-primary-foreground text-[10px] font-mono rounded uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
               <ImageIcon size={12} /> Asset Manager
             </span>
           </div>
-          <h2 className="text-[24px] sm:text-[28px] font-serif font-bold text-[#0e0e0f] tracking-tight flex items-center gap-3">
+          <h2 className="text-[24px] sm:text-[28px] font-serif font-bold text-foreground tracking-tight flex items-center gap-3">
             <span className="truncate max-w-[200px] sm:max-w-md md:max-w-lg">{eventTitle}</span>
-            <span className="text-[#dbd8cf] font-sans font-normal text-[22px] shrink-0">/</span> 
-            <span className="text-[#5a5a64] font-sans font-normal text-[22px] shrink-0">Media</span>
+            <span className="text-border font-sans font-normal text-[22px] shrink-0">/</span> 
+            <span className="text-muted-foreground font-sans font-normal text-[22px] shrink-0">Media</span>
           </h2>
-          <p className="text-[12px] sm:text-[13px] text-[#5a5a64] mt-1 font-medium">
-            Vault Node: <span className="font-mono text-[#c94a20] uppercase">{eventId.slice(0, 12)}</span>
+          <p className="text-[12px] sm:text-[13px] text-muted-foreground mt-1 font-medium">
+            Vault Node: <span className="font-mono text-primary uppercase">{eventId.slice(0, 12)}</span>
           </p>
         </div>
         
@@ -73,7 +73,7 @@ export default function MediaPage() {
               description: "Ready to ingest new biometric assets.",
             });
           }}
-          className="group w-full sm:w-auto shrink-0 flex items-center justify-center gap-3 px-6 py-3.5 sm:py-3 bg-[#0e0e0f] text-white rounded-xl text-[12px] font-bold uppercase tracking-widest hover:bg-[#c94a20] transition-all shadow-lg shadow-black/10 active:scale-95"
+          className="group w-full sm:w-auto shrink-0 flex items-center justify-center gap-3 px-6 py-3.5 sm:py-3 bg-primary text-primary-foreground rounded-lg text-[12px] font-bold uppercase tracking-widest hover:brightness-110 transition-all shadow-lg active:scale-95"
         >
           <CloudUpload size={16} className="group-hover:-translate-y-0.5 transition-transform" />
           Ingest Media
@@ -81,7 +81,7 @@ export default function MediaPage() {
       </header>
 
       {/* 2. THE GRID WITH REFRESH LOGIC */}
-      <div className="bg-white border border-[#dbd8cf] rounded-[24px] sm:rounded-[32px] overflow-hidden min-h-[400px] shadow-sm">
+      <div className="bg-card border border-border rounded-xl overflow-hidden min-h-[400px] shadow-sm">
         <MediaClientPage key={refreshKey} eventId={eventId} />
       </div>
 

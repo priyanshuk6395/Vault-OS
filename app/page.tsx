@@ -13,6 +13,7 @@ import {
   Fingerprint
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 const CREATOR_NAME = process.env.NEXT_PUBLIC_CREATOR_NAME || "😇";
 
@@ -48,7 +49,7 @@ function HeroSection() {
     <section ref={sectionRef} className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
       {/* Glowing Orb Background — now breathing continuously instead of static */}
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#c94a20]/20 rounded-full blur-[120px] pointer-events-none mix-blend-screen"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-accent-coral/20 rounded-full blur-[120px] pointer-events-none mix-blend-screen"
         animate={{
           opacity: [0.35, 0.6, 0.35],
           scale: [1, 1.12, 1]
@@ -58,7 +59,7 @@ function HeroSection() {
 
       {/* Scanning line sweep — a nod to the biometric-scan theme */}
       <motion.div
-        className="absolute left-0 w-full h-px bg-gradient-to-r from-transparent via-[#c94a20]/60 to-transparent pointer-events-none"
+        className="absolute left-0 w-full h-px bg-linear-to-r from-transparent via-accent-coral/60 to-transparent pointer-events-none"
         initial={{ top: "20%" }}
         animate={{ top: ["10%", "90%", "10%"] }}
         transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
@@ -73,25 +74,25 @@ function HeroSection() {
       >
         <motion.div
           variants={heroItem}
-          className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full backdrop-blur-md mb-8"
+          className="inline-flex items-center gap-2 px-3 py-1.5 bg-card border border-border rounded-full backdrop-blur-md mb-8"
         >
           <motion.div
-            className="w-2 h-2 bg-[#c94a20] rounded-full"
+            className="w-2 h-2 bg-accent-coral rounded-full"
             animate={{ opacity: [1, 0.3, 1], scale: [1, 1.3, 1] }}
             transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
           />
-          <span className="text-[10px] font-mono text-white/60 uppercase tracking-[0.2em]">
+          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-[0.2em]">
             Vault OS Online
           </span>
         </motion.div>
 
         <motion.h1
           variants={heroItem}
-          className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white tracking-tight mb-6 leading-tight"
+          className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-foreground tracking-tight mb-6 leading-tight"
         >
           Biometric Media <br className="hidden md:block" />
           <motion.span
-            className="inline-block text-transparent bg-clip-text bg-[length:200%_auto] bg-gradient-to-r from-[#c94a20] via-[#e05325] to-[#c94a20] italic"
+            className="inline-block text-transparent bg-clip-text bg-size-[200%_auto] bg-linear-to-r from-primary via-accent-coral to-primary italic"
             animate={{ backgroundPosition: ["0% center", "200% center"] }}
             transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
           >
@@ -101,7 +102,7 @@ function HeroSection() {
 
         <motion.p
           variants={heroItem}
-          className="text-white/40 text-sm md:text-base max-w-2xl mx-auto leading-relaxed font-mono uppercase tracking-widest mb-12"
+          className="text-muted-foreground text-sm md:text-base max-w-2xl mx-auto leading-relaxed font-mono uppercase tracking-widest mb-12"
         >
           End-to-end encrypted event galleries powered by AWS Rekognition.
           Guests find their photos instantly via facial vector mapping.
@@ -114,7 +115,7 @@ function HeroSection() {
           <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.96 }} className="w-full sm:w-auto">
             <Link
               href="/login"
-              className="group w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-[#c94a20] text-white rounded-full font-bold uppercase tracking-widest text-[12px] transition-shadow hover:bg-[#e05325] shadow-[0_0_40px_rgba(201,74,32,0.3)] hover:shadow-[0_0_60px_rgba(201,74,32,0.5)]"
+              className="group w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-primary text-primary-foreground rounded-full font-bold uppercase tracking-widest text-[12px] transition-shadow hover:brightness-110 shadow-lg shadow-primary/20"
             >
               <ShieldCheck size={16} />
               Command Center
@@ -131,12 +132,12 @@ function HeroSection() {
           <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.96 }} className="w-full sm:w-auto">
             <Link
               href="/admin/new-event"
-              className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-white/5 border border-white/10 text-white rounded-full font-bold uppercase tracking-widest text-[12px] hover:bg-white/10 transition-colors backdrop-blur-md"
+              className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-card border border-border text-foreground rounded-full font-bold uppercase tracking-widest text-[12px] hover:bg-subtle transition-colors backdrop-blur-md"
             >
               <motion.span
                 animate={{ rotate: [0, 15, -15, 0] }}
                 transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                className="inline-flex text-[#c94a20]"
+                className="inline-flex text-accent-coral"
               >
                 <Zap size={16} />
               </motion.span>
@@ -156,29 +157,29 @@ function FeatureBento() {
       title: "AI Face Clustering",
       desc: "Instantaneous vector matching across thousands of assets.",
       icon: ScanFace,
-      className: "md:col-span-2 bg-[#121214]",
-      accent: "text-[#c94a20]"
+      className: "md:col-span-2 bg-card",
+      accent: "text-accent-coral"
     },
     {
       title: "Zero-Trust Security",
       desc: "Passcode-gated portals with AES-256 cloud encryption.",
       icon: LockKeyhole,
-      className: "md:col-span-1 bg-[#121214]",
-      accent: "text-green-500"
+      className: "md:col-span-1 bg-card",
+      accent: "text-accent-teal"
     },
     {
       title: "Edge Compute",
       desc: "Client-side HEIC conversion and compression.",
       icon: Cpu,
-      className: "md:col-span-1 bg-[#121214]",
-      accent: "text-blue-500"
+      className: "md:col-span-1 bg-card",
+      accent: "text-primary"
     },
     {
       title: "Immutable Audits",
       desc: "Track every cryptographic handshake and biometric match.",
       icon: Fingerprint,
-      className: "md:col-span-2 bg-[#121214]",
-      accent: "text-[#c8b89a]"
+      className: "md:col-span-2 bg-card",
+      accent: "text-accent-amber"
     }
   ];
 
@@ -194,7 +195,7 @@ function FeatureBento() {
             transition={{ duration: 0.6, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
             whileHover={{ y: -6 }}
             className={cn(
-              "group p-8 rounded-[32px] border border-white/5 relative overflow-hidden transition-colors hover:border-white/10 hover:bg-white/[0.03]",
+              "group p-8 rounded-lg border border-border relative overflow-hidden transition-colors hover:border-primary/30 hover:bg-subtle",
               feat.className
             )}
           >
@@ -209,12 +210,12 @@ function FeatureBento() {
               <motion.div
                 whileHover={{ scale: 1.1, rotate: -6 }}
                 transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                className={cn("w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-lg", feat.accent)}
+                className={cn("w-12 h-12 rounded-lg bg-subtle border border-border flex items-center justify-center mb-6 shadow-lg", feat.accent)}
               >
                 <feat.icon size={24} />
               </motion.div>
-              <h3 className="text-xl font-serif font-bold text-white mb-2">{feat.title}</h3>
-              <p className="text-sm font-mono text-white/40 uppercase tracking-widest leading-relaxed max-w-[250px]">
+              <h3 className="text-xl font-serif font-bold text-foreground mb-2">{feat.title}</h3>
+              <p className="text-sm font-mono text-muted-foreground uppercase tracking-widest leading-relaxed max-w-64">
                 {feat.desc}
               </p>
             </div>
@@ -233,16 +234,16 @@ function Footer() {
       whileInView={{ opacity: 1 }}
       viewport={{ once: true }}
       transition={{ duration: 0.8 }}
-      className="border-t border-white/10 bg-black/50 backdrop-blur-xl mt-20"
+      className="border-t border-border bg-background-elevated/90 backdrop-blur-xl mt-20"
     >
       <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3 opacity-50">
-          <ShieldCheck size={16} className="text-white" />
-          <span className="text-[10px] font-mono text-white uppercase tracking-[0.2em]">
+          <ShieldCheck size={16} className="text-foreground" />
+          <span className="text-[10px] font-mono text-foreground uppercase tracking-[0.2em]">
             Vault OS // Enterprise Grade
           </span>
         </div>
-        <div className="text-[10px] font-mono text-white/30 uppercase tracking-[0.2em]">
+        <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-[0.2em]">
           Engineered by {CREATOR_NAME}
         </div>
       </div>
@@ -257,12 +258,12 @@ export default function LandingPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6 }}
-      className="min-h-screen bg-[#0d0d0f] font-sans selection:bg-[#c94a20]/30 relative"
+      className="min-h-screen bg-background font-sans selection:bg-primary/20 relative"
     >
       {/* Global Background Texture — slow drift to keep the page feeling alive */}
       <motion.div
         className="fixed inset-0 opacity-[0.03] pointer-events-none z-0"
-        style={{ backgroundImage: 'radial-gradient(#c94a20 1px, transparent 1px)', backgroundSize: '32px 32px' }}
+        style={{ backgroundImage: 'radial-gradient(var(--accent-coral) 1px, transparent 1px)', backgroundSize: '32px 32px' }}
         animate={{ backgroundPosition: ["0px 0px", "32px 32px"] }}
         transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
       />
@@ -272,18 +273,21 @@ export default function LandingPage() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="absolute top-0 left-0 w-full p-6 z-50 flex justify-between items-center max-w-7xl mx-auto left-1/2 -translate-x-1/2"
+        className="absolute top-0 left-1/2 w-full p-6 z-50 flex justify-between items-center max-w-7xl -translate-x-1/2"
       >
-        <div className="text-[14px] font-serif font-bold text-white tracking-tight flex items-center gap-2">
+        <div className="text-[14px] font-serif font-bold text-foreground tracking-tight flex items-center gap-2">
           <motion.div
-            className="w-2 h-2 bg-[#c94a20] rounded-full"
+            className="w-2 h-2 bg-accent-coral rounded-full"
             animate={{ opacity: [1, 0.4, 1] }}
             transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
           />
           Vault
         </div>
-        <div className="text-[9px] font-mono text-white/30 uppercase tracking-[0.3em] border border-white/10 px-3 py-1 rounded-full backdrop-blur-md">
-          System Status: Optimal
+        <div className="flex items-center gap-3">
+          <div className="text-[9px] font-mono text-muted-foreground uppercase tracking-[0.3em] border border-border px-3 py-1 rounded-full backdrop-blur-md">
+            System Status: Optimal
+          </div>
+          <ThemeToggle />
         </div>
       </motion.nav>
 

@@ -11,7 +11,7 @@ export default function GuestUploadTrigger({ eventId, personId }: { eventId: str
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="group bg-white text-black px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-[#c94a20] hover:text-white transition-all shadow-lg active:scale-95"
+        className="group bg-primary text-primary-foreground px-6 py-3 rounded-lg text-sm font-bold flex items-center gap-2 hover:brightness-110 transition-all shadow-lg active:scale-95"
       >
         <Upload size={18} className="transition-transform group-hover:-translate-y-1" />
         Contribute Photos

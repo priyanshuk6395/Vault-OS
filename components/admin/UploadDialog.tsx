@@ -69,14 +69,14 @@ export default function UploadDialog({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 15 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="relative bg-[#fdfcf9] w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-[#dbd8cf]"
+            className="relative bg-card text-card-foreground w-full max-w-lg rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-border"
           >
-            <div className="p-7 pb-6 border-b border-[#dbd8cf] flex justify-between items-center bg-[#fdf2e0]/30">
+            <div className="p-7 pb-6 border-b border-border flex justify-between items-center bg-subtle">
               <div>
-                <h3 className="text-xl font-extrabold text-[#0e0e0f] tracking-tighter">
+                <h3 className="text-xl font-extrabold text-foreground tracking-tighter">
                   System Ingestion
                 </h3>
-                <p className="text-[11px] font-mono font-bold uppercase tracking-[0.22em] text-[#c94a20] mt-1.5">
+                <p className="text-[11px] font-mono font-bold uppercase tracking-[0.22em] text-accent-coral mt-1.5">
                   Staging Environment
                 </p>
               </div>
@@ -86,7 +86,7 @@ export default function UploadDialog({
                 onClick={handleAbort} 
                 className="p-2.5 hover:bg-black/5 rounded-full transition-colors"
               >
-                <X size={20} className="text-[#0e0e0f]" />
+                <X size={20} className="text-foreground" />
               </motion.button>
             </div>
 
@@ -94,19 +94,19 @@ export default function UploadDialog({
               <label className={cn(
                   "group relative flex flex-col items-center justify-center w-full h-56 border-2 border-dashed rounded-[1.75rem] cursor-pointer overflow-hidden transition-colors duration-500",
                   files.length > 0
-                    ? "border-[#c94a20] bg-[#fdf2e0]/30"
-                    : "border-[#dbd8cf] hover:border-[#c94a20]"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary"
               )}>
                 {/* Subtle pulse effect behind the icon when active */}
                 {files.length > 0 && (
                   <motion.div 
                     animate={{ scale: [1, 1.5, 1], opacity: [0.1, 0, 0.1] }}
                     transition={{ repeat: Infinity, duration: 3 }}
-                    className="absolute w-24 h-24 bg-[#c94a20] rounded-full blur-2xl"
+                    className="absolute w-24 h-24 bg-primary rounded-full blur-2xl"
                   />
                 )}
-                <Upload className="w-9 h-9 text-[#c94a20] mb-3.5 group-hover:-translate-y-1 transition-transform duration-300 relative z-10" />
-                <span className="text-sm font-bold uppercase tracking-tight text-[#0e0e0f] relative z-10">
+                <Upload className="w-9 h-9 text-primary mb-3.5 group-hover:-translate-y-1 transition-transform duration-300 relative z-10" />
+                <span className="text-sm font-bold uppercase tracking-tight text-foreground relative z-10">
                   {files.length > 0 ? `${files.length} FILES STAGED` : "Select Archive Files"}
                 </span>
                 <input type="file" multiple accept="image/*,.heic,.heif" className="hidden" onChange={handleFileSelect} />
@@ -123,14 +123,14 @@ export default function UploadDialog({
                         animate={{ opacity: 1, x: 0, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ delay: idx * 0.04 }} // Staggered Entrance
-                        className="bg-white border border-[#dbd8cf] p-4.5 rounded-2xl flex items-center gap-4.5 shadow-sm"
+                        className="bg-background-elevated border border-border p-4.5 rounded-lg flex items-center gap-4.5 shadow-sm"
                       >
-                        <ImageIcon size={19} className="text-[#c94a20] shrink-0" />
+                        <ImageIcon size={19} className="text-accent-coral shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <span className="text-[11px] font-bold truncate tracking-tight text-[#0e0e0f] block">
+                          <span className="text-[11px] font-bold truncate tracking-tight text-foreground block">
                             {file.name}
                           </span>
-                          <span className="text-[9px] font-mono text-[#5a5a64]">
+                          <span className="text-[9px] font-mono text-muted-foreground">
                             Ready for background processing
                           </span>
                         </div>
@@ -141,10 +141,10 @@ export default function UploadDialog({
               )}
             </div>
 
-            <div className="p-8 bg-[#f5f4f0] border-t border-[#dbd8cf] flex gap-5 items-center z-10">
+            <div className="p-8 bg-subtle border-t border-border flex gap-5 items-center z-10">
               <button 
                 onClick={handleAbort} 
-                className="w-[100px] text-left py-4 text-xs font-bold uppercase tracking-[0.3em] text-[#5a5a64] hover:text-[#0e0e0f] transition-colors"
+                className="w-[100px] text-left py-4 text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground hover:text-foreground transition-colors"
               >
                 Abort
               </button>
@@ -153,7 +153,7 @@ export default function UploadDialog({
                 whileTap={files.length > 0 ? { scale: 0.97 } : {}}
                 onClick={handleCommit}
                 disabled={files.length === 0}
-                className="flex-1 py-4 bg-[#c94a20] text-white rounded-2xl text-xs font-bold uppercase tracking-[0.25em] disabled:opacity-40 flex items-center justify-center gap-3.5 overflow-hidden relative shadow-lg shadow-[#c94a20]/20"
+                className="flex-1 py-4 bg-primary text-primary-foreground rounded-xl text-xs font-bold uppercase tracking-[0.25em] disabled:opacity-40 flex items-center justify-center gap-3.5 overflow-hidden relative shadow-lg shadow-primary/20"
               >
                 {/* Button shine effect */}
                 {files.length > 0 && (

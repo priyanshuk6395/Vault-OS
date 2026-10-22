@@ -19,7 +19,7 @@ export default function LogoutButton({ eventId }: { eventId: string }) {
       disabled={isExiting}
       className={cn(
         "group flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300",
-        "bg-white/5 border-white/10 text-white/40 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-500",
+        "bg-card border-border text-muted-foreground hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-500",
         isExiting && "opacity-50 cursor-wait"
       )}
     >

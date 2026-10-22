@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useRef } from "react";
+import imageCompression from "browser-image-compression";
+import { v4 as uuidv4 } from "uuid";
 
 interface UploadTask {
   id: string;
@@ -9,157 +11,208 @@ interface UploadTask {
   status: "pending" | "processing" | "uploading" | "complete" | "error";
   statusMessage: string; // <-- NEW: Granular feedback for the HUD
   eventId: string;
+  uploaderId?: string;
+  assetId?: string;
   file?: File;
 }
 
 interface UploadContextType {
   queue: UploadTask[];
-  addFilesToQueue: (files: File[], eventId: string) => void;
+  addFilesToQueue: (files: File[], eventId: string, uploaderId?: string) => string[];
+  retryFailedTasks: () => void;
+  clearCompletedTasks: () => void;
 }
 
 const UploadContext = createContext<UploadContextType | undefined>(undefined);
 
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, baseDelay = 600): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt >= retries) throw error;
+      await new Promise((resolve) => setTimeout(resolve, baseDelay * 2 ** attempt));
+    }
+  }
+}
+
 export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
-  // UI State (Only used for rendering the visual HUD)
   const [uiQueue, setUiQueue] = useState<UploadTask[]>([]);
-  
-  // THE ENGINE MEMORY: Completely immune to React lifecycle batching
   const queueRef = useRef<UploadTask[]>([]);
   const activeUploads = useRef(0);
-  const MAX_CONCURRENCY = 2; // Safe limit for RAM
+  const hardwareConcurrency = typeof navigator === "undefined" ? 4 : navigator.hardwareConcurrency || 4;
+  const maxConcurrency = Math.max(3, Math.min(hardwareConcurrency, 6));
 
-  // Syncs the background memory to the visible UI
   const syncUI = () => setUiQueue([...queueRef.current]);
 
   const updateTask = (id: string, updates: Partial<UploadTask>) => {
-    queueRef.current = queueRef.current.map((task) => 
+    queueRef.current = queueRef.current.map((task) =>
       task.id === id ? { ...task, ...updates } : task
     );
     syncUI();
   };
 
-  const addFilesToQueue = (files: File[], eventId: string) => {
+  const executeUploadPipeline = async (task: UploadTask, onAssetInitialized: (assetId: string) => void) => {
+    const originalFile = task.file;
+    if (!originalFile) throw new Error("Upload task has no file");
+
+    let fileToUpload = originalFile;
+    const isImage = originalFile.type.startsWith("image/") || /\.(heic|heif)$/i.test(originalFile.name);
+
+    if (isImage) {
+      if (/\.(heic|heif)$/i.test(originalFile.name)) {
+        updateTask(task.id, { statusMessage: "Decoding HEIC image..." });
+        const heic2any = (await import("heic2any")).default;
+        const decoded = await heic2any({ blob: originalFile, toType: "image/jpeg", quality: 0.85 });
+        const jpegBlob = Array.isArray(decoded) ? decoded[0] : decoded;
+        const jpegName = originalFile.name.replace(/\.(heic|heif)$/i, ".jpg");
+        fileToUpload = new File([jpegBlob], jpegName, { type: "image/jpeg", lastModified: originalFile.lastModified });
+      }
+
+      updateTask(task.id, { statusMessage: "Converting to WebP..." });
+      const compressed = await imageCompression(fileToUpload, {
+        maxSizeMB: 1.2,
+        maxWidthOrHeight: 2048,
+        useWebWorker: true,
+        fileType: "image/webp",
+        initialQuality: 0.85,
+      });
+      const webpName = fileToUpload.name.replace(/\.[^.]+$/, ".webp");
+      fileToUpload = new File([compressed], webpName, {
+        type: "image/webp",
+        lastModified: originalFile.lastModified,
+      });
+    }
+
+    updateTask(task.id, { statusMessage: "Requesting upload URL...", status: "uploading" });
+    const initialized = await withRetry(async () => {
+      const response = await fetch("/api/upload/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: task.eventId,
+          filename: fileToUpload.name,
+          contentType: fileToUpload.type || "application/octet-stream",
+          size: fileToUpload.size,
+          assetType: fileToUpload.type.startsWith("video/") ? "video" : "image",
+          uploaderId: task.uploaderId,
+          clientUploadId: task.id,
+        }),
+      });
+      if (!response.ok) throw new Error(`Upload initialization failed (${response.status})`);
+      const data = await response.json();
+      if (!data.uploadUrl || !data.assetId) throw new Error("Upload initialization response was incomplete");
+      onAssetInitialized(data.assetId);
+      updateTask(task.id, { assetId: data.assetId });
+      return data as { uploadUrl: string; assetId: string };
+    });
+
+    updateTask(task.id, { statusMessage: "Uploading..." });
+    await withRetry(() => new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", initialized.uploadUrl);
+      xhr.setRequestHeader("Content-Type", fileToUpload.type || "application/octet-stream");
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          if (progress % 5 === 0 || progress === 100) updateTask(task.id, { progress });
+        }
+      };
+      xhr.onload = () => xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`Storage upload failed (${xhr.status})`));
+      xhr.onerror = () => reject(new Error("Storage upload network error"));
+      xhr.send(fileToUpload);
+    }));
+
+    for (let attempt = 0; attempt < 300; attempt += 1) {
+      updateTask(task.id, {
+        statusMessage: attempt === 0 ? "Starting AI indexing..." : "AI indexing in progress...",
+      });
+      const stillProcessing = await withRetry(async () => {
+        const response = await fetch("/api/upload/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assetId: initialized.assetId, uploaderId: task.uploaderId }),
+        });
+        if (!response.ok) throw new Error(`Upload finalization failed (${response.status})`);
+        return response.status === 202;
+      });
+      if (!stillProcessing) return;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error("Timed out while waiting for image processing to finish");
+  };
+
+  const processTask = async (task: UploadTask) => {
+    updateTask(task.id, { status: "processing", statusMessage: "Preparing image..." });
+    let assetId: string | undefined;
+    try {
+      await executeUploadPipeline(task, (initializedAssetId) => { assetId = initializedAssetId; });
+      updateTask(task.id, { status: "complete", progress: 100, statusMessage: "Secured" });
+    } catch (error) {
+      console.error(`[UPLOAD_FAILED] ${task.fileName}:`, error);
+      if (assetId) {
+        try {
+          const response = await fetch("/api/upload/fail", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assetId, uploaderId: task.uploaderId }),
+          });
+          if (!response.ok) console.error(`[UPLOAD_FAILURE_REPORT_FAILED] ${task.fileName}: ${response.status}`);
+        } catch (reportError) {
+          console.error(`[UPLOAD_FAILURE_REPORT_FAILED] ${task.fileName}:`, reportError);
+        }
+      }
+      updateTask(task.id, { status: "error", statusMessage: "Upload failed. Retry available." });
+    }
+  };
+
+  const processQueue = () => {
+    while (activeUploads.current < maxConcurrency) {
+      const task = queueRef.current.find((candidate) => candidate.status === "pending");
+      if (!task) return;
+      activeUploads.current += 1;
+      void processTask(task).finally(() => {
+        activeUploads.current -= 1;
+        processQueue();
+      });
+    }
+  };
+
+  const addFilesToQueue = (files: File[], eventId: string, uploaderId?: string) => {
     const newTasks: UploadTask[] = files.map((f) => ({
-      id: `${f.name}-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      id: uuidv4(),
       fileName: f.name,
       progress: 0,
       status: "pending",
       statusMessage: "Queued...",
       eventId,
+      uploaderId,
       file: f,
     }));
 
     queueRef.current = [...queueRef.current, ...newTasks];
     syncUI();
-    
-    // Ignite the engine instantly
+    processQueue();
+    return newTasks.map((task) => task.id);
+  };
+
+  const retryFailedTasks = () => {
+    queueRef.current = queueRef.current.map((task) => task.status === "error"
+      ? { ...task, status: "pending", progress: 0, statusMessage: "Queued for retry..." }
+      : task);
+    syncUI();
     processQueue();
   };
 
-  // ⚙️ THE WORKER ENGINE
-  const processQueue = async () => {
-    if (activeUploads.current >= MAX_CONCURRENCY) return;
-
-    // Grab the very first pending task directly from memory
-    const task = queueRef.current.find((t) => t.status === "pending");
-    if (!task || !task.file) return;
-
-    activeUploads.current += 1;
-    updateTask(task.id, { status: "processing", statusMessage: "Initializing..." });
-
-    try {
-      await executeUploadPipeline(task.file, task.id, task.eventId);
-      updateTask(task.id, { status: "complete", progress: 100, statusMessage: "Secured" });
-    } catch (error) {
-      console.error(`[PIPELINE_FAILED] ${task.fileName}:`, error);
-      updateTask(task.id, { status: "error", statusMessage: "Failed" });
-    } finally {
-      activeUploads.current -= 1;
-      // Recursively call processQueue to instantly pull the next file
-      processQueue(); 
-    }
-  };
-
-  // 🚀 THE PIPELINE
-  const executeUploadPipeline = async (file: File, taskId: string, eventId: string) => {
-    let fileToProcess = file;
-
-    // 1. HEIC Conversion (Dynamic Import prevents server crash)
-    if (file.name.match(/\.(heic|heif)$/i)) {
-      updateTask(taskId, { statusMessage: "Converting Format..." });
-      try {
-        const heic2any = (await import("heic2any")).default;
-        const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.8 });
-        const blobData = Array.isArray(blob) ? blob[0] : blob;
-        fileToProcess = new File([blobData], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
-      } catch (err) {
-        console.warn(`[HEIC Skip] ${file.name}`);
-      }
-    }
-
-    // 2. RAM-Intensive Compression
-    updateTask(taskId, { statusMessage: "Compressing Payload..." });
-    try {
-      const imageCompression = (await import("browser-image-compression")).default;
-      fileToProcess = await imageCompression(fileToProcess, {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 2048,
-        useWebWorker: true,
-      });
-    } catch (err) {
-      console.warn(`[Compression Skip] ${file.name}`);
-    }
-
-    // 3. AWS Handshake
-    updateTask(taskId, { statusMessage: "Generating Keys...", status: "uploading" });
-    const initRes = await fetch("/api/upload/init", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        eventId,
-        filename: fileToProcess.name,
-        contentType: fileToProcess.type,
-        size: fileToProcess.size,
-        assetType: "image",
-      }),
-    });
-
-    if (!initRes.ok) throw new Error("Infrastructure Handshake Failed");
-    const { uploadUrl, assetId } = await initRes.json();
-
-    // 4. S3 Transmission
-    updateTask(taskId, { statusMessage: "Transmitting..." });
-    await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", uploadUrl);
-      xhr.setRequestHeader("Content-Type", fileToProcess.type);
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          // Throttling UI updates to prevent React from freezing on fast connections
-          if (percent % 5 === 0 || percent === 100) {
-            updateTask(taskId, { progress: percent });
-          }
-        }
-      };
-
-      xhr.onload = () => (xhr.status === 200 ? resolve(true) : reject("S3 PUT Failed"));
-      xhr.onerror = () => reject("Network Error");
-      xhr.send(fileToProcess);
-    });
-
-    // 5. Completion Protocol
-    updateTask(taskId, { statusMessage: "Verifying Hash..." });
-    await fetch("/api/upload/complete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assetId }),
-    });
+  const clearCompletedTasks = () => {
+    queueRef.current = queueRef.current.filter((task) => task.status !== "complete");
+    syncUI();
   };
 
   return (
-    <UploadContext.Provider value={{ queue: uiQueue, addFilesToQueue }}>
+    <UploadContext.Provider value={{ queue: uiQueue, addFilesToQueue, retryFailedTasks, clearCompletedTasks }}>
       {children}
     </UploadContext.Provider>
   );

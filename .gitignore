@@ -12,9 +12,17 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/
+/.next-e2e*/
+/.next-final*/
+/.next-passcode/
+/.next-login/
+/.next-login-server/
+/.next-login*/
 /out/
 
 # production

@@ -3,16 +3,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { FaceLivenessDetector } from "@aws-amplify/ui-react-liveness";
-import {
-  ThemeProvider,
-  defaultDarkModeOverride,
-  Theme,
-} from "@aws-amplify/ui-react";
+import { ThemeProvider, Theme } from "@aws-amplify/ui-react";
 import { Amplify } from "aws-amplify";
 import { Loader2, ScanFace, ShieldCheck, Fingerprint } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { useTheme } from "next-themes";
 import "@aws-amplify/ui-react/styles.css";
 
 // Configure Amplify
@@ -25,25 +21,22 @@ Amplify.configure({
   },
 });
 
-// 🎨 AWS NATIVE THEME OVERRIDE
-// Forces the Amplify component to use your Vault OS orange instead of default blue
 const vaultTheme: Theme = {
   name: "vault-os-theme",
-  overrides: [defaultDarkModeOverride],
   tokens: {
     colors: {
       background: {
-        primary: { value: "#0d0d0f" },
-        secondary: { value: "#121214" },
+        primary: { value: "var(--background)" },
+        secondary: { value: "var(--background-elevated)" },
       },
       primary: {
-        10: { value: "#fdf2e0" },
-        20: { value: "#fbe5c0" },
-        40: { value: "#f5c980" },
-        60: { value: "#efa840" },
-        80: { value: "#c94a20" }, // Base brand color
-        90: { value: "#a03b1a" }, // Hover state
-        100: { value: "#782c13" },
+        10: { value: "var(--accent-lavender)" },
+        20: { value: "var(--secondary)" },
+        40: { value: "var(--accent-coral)" },
+        60: { value: "var(--primary)" },
+        80: { value: "var(--primary)" },
+        90: { value: "var(--accent-coral)" },
+        100: { value: "var(--primary)" },
       },
     },
     components: {
@@ -59,7 +52,9 @@ const vaultTheme: Theme = {
 
 export default function FindMeCamera({ eventId }: { eventId: string }) {
   const router = useRouter();
+  const { resolvedTheme } = useTheme();
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -68,13 +63,17 @@ export default function FindMeCamera({ eventId }: { eventId: string }) {
         const res = await fetch(`/api/events/${eventId}/liveness/create`, {
           method: "POST",
         });
+        if (!res.ok) throw new Error("Liveness session request failed");
         const data = await res.json();
+        if (!data.sessionId) throw new Error("Liveness session was not created");
+        if (isMounted) setSessionError(false);
 
         // Slight artificial delay so the user sees the cool boot sequence
         setTimeout(() => {
           if (isMounted && data.sessionId) setSessionId(data.sessionId);
         }, 1200);
       } catch (err) {
+        if (isMounted) setSessionError(true);
         toast.error("Failed to initialize security protocol.");
       }
     }
@@ -128,32 +127,38 @@ export default function FindMeCamera({ eventId }: { eventId: string }) {
   // 🚀 CINEMATIC LOADING STATE
   if (!sessionId) {
     return (
-      <div className="w-full max-w-sm mx-auto aspect-[3/4] sm:aspect-square bg-[#0d0d0f] rounded-[32px] border border-white/10 shadow-[0_0_50px_rgba(201,74,32,0.15)] flex flex-col items-center justify-center relative overflow-hidden">
+      <div role={sessionError ? "alert" : "status"} aria-live="polite" className="w-full max-w-sm mx-auto aspect-[3/4] sm:aspect-square bg-card rounded-xl border border-border shadow-lg flex flex-col items-center justify-center relative overflow-hidden">
         {/* Ambient Glow */}
-        <div className="absolute w-48 h-48 bg-[#c94a20]/20 rounded-full blur-[50px] animate-pulse" />
+          <div className="absolute w-48 h-48 bg-primary/20 rounded-full blur-[50px] animate-pulse" />
 
         {/* Scanning Line */}
         <motion.div
           animate={{ y: ["-100%", "400%"] }}
           transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-          className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-transparent via-[#c94a20]/20 to-transparent z-0"
+          className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-transparent via-primary/20 to-transparent z-0"
         />
 
         <div className="relative z-10 flex flex-col items-center">
           <div className="relative mb-6">
-            <div className="absolute inset-0 border border-[#c94a20]/50 rounded-full animate-ping" />
-            <div className="w-16 h-16 bg-[#c94a20]/10 border border-[#c94a20]/30 rounded-full flex items-center justify-center backdrop-blur-md">
-              <ScanFace className="w-8 h-8 text-[#c94a20]" />
+            <div className="absolute inset-0 border border-primary/50 rounded-full animate-ping" />
+            <div className="w-16 h-16 bg-primary/10 border border-primary/30 rounded-full flex items-center justify-center backdrop-blur-md">
+              <ScanFace className="w-8 h-8 text-primary" />
             </div>
           </div>
 
-          <h3 className="text-white font-serif text-lg font-bold tracking-tight mb-2">
+          <h3 className="text-card-foreground font-serif text-lg font-bold tracking-tight mb-2">
             Establishing Uplink
           </h3>
 
-          <div className="flex items-center gap-2 text-[10px] font-mono text-[#5a5a64] uppercase tracking-widest mb-6">
-            <Loader2 className="w-3 h-3 animate-spin text-[#c94a20]" />
-            Provisioning AWS Session...
+          <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-6">
+            {sessionError ? (
+              <span className="text-accent-coral">Security session unavailable. Refresh to retry.</span>
+            ) : (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                Provisioning AWS Session...
+              </>
+            )}
           </div>
 
           <div className="flex gap-1">
@@ -162,7 +167,7 @@ export default function FindMeCamera({ eventId }: { eventId: string }) {
                 key={i}
                 animate={{ opacity: [0.2, 1, 0.2] }}
                 transition={{ repeat: Infinity, duration: 1, delay: i * 0.2 }}
-                className="w-1.5 h-1.5 bg-[#c94a20] rounded-full"
+                className="w-1.5 h-1.5 bg-primary rounded-full"
               />
             ))}
           </div>
@@ -176,25 +181,26 @@ export default function FindMeCamera({ eventId }: { eventId: string }) {
       {/* 🚀 TACTICAL CORNER BRACKETS (Overlays on top of the camera) */}
       <div className="absolute inset-4 pointer-events-none z-10 flex flex-col justify-between transition-opacity duration-1000 opacity-30 group-hover:opacity-60">
         <div className="flex justify-between">
-          <div className="w-8 h-8 border-t-2 border-l-2 border-[#c94a20] rounded-tl-2xl" />
-          <div className="w-8 h-8 border-t-2 border-r-2 border-[#c94a20] rounded-tr-2xl" />
+          <div className="w-8 h-8 border-t-2 border-l-2 border-primary rounded-tl-2xl" />
+          <div className="w-8 h-8 border-t-2 border-r-2 border-primary rounded-tr-2xl" />
         </div>
         <div className="flex justify-between items-center px-2">
-          <div className="text-[8px] font-mono text-[#c94a20] uppercase tracking-[0.3em] rotate-[-90deg] origin-left translate-y-8">
+          <div className="text-[8px] font-mono text-primary uppercase tracking-[0.3em] rotate-[-90deg] origin-left translate-y-8">
             AWS_LIVENESS_V2
           </div>
-          <div className="text-[8px] font-mono text-[#c94a20] uppercase tracking-[0.3em] rotate-[90deg] origin-right translate-y-8">
+          <div className="text-[8px] font-mono text-primary uppercase tracking-[0.3em] rotate-[90deg] origin-right translate-y-8">
             AES_256_ENCRYPTED
           </div>
         </div>
         <div className="flex justify-between">
-          <div className="w-8 h-8 border-b-2 border-l-2 border-[#c94a20] rounded-bl-2xl" />
-          <div className="w-8 h-8 border-b-2 border-r-2 border-[#c94a20] rounded-br-2xl" />
+          <div className="w-8 h-8 border-b-2 border-l-2 border-primary rounded-bl-2xl" />
+          <div className="w-8 h-8 border-b-2 border-r-2 border-primary rounded-br-2xl" />
         </div>
       </div>
 
       {/* 🚀 AWS LIVENESS DETECTOR */}
-      <div className="rounded-[24px] sm:rounded-[32px] overflow-y-auto overflow-x-hidden border border-white/10 shadow-[0_0_50px_rgba(201,74,32,0.15)] relative bg-[#0d0d0f] h-[85dvh] min-h-[650px] max-h-[800px] w-full flex flex-col">        <ThemeProvider theme={vaultTheme} colorMode="dark">
+      <div className="rounded-xl overflow-y-auto overflow-x-hidden border border-border shadow-lg relative bg-card h-[85dvh] min-h-[650px] max-h-[800px] w-full flex flex-col">
+        <ThemeProvider theme={vaultTheme} colorMode={resolvedTheme === "dark" ? "dark" : "light"}>
           <FaceLivenessDetector
             sessionId={sessionId}
             region={process.env.NEXT_PUBLIC_AWS_REGION || "ap-south-1"}
@@ -206,12 +212,12 @@ export default function FindMeCamera({ eventId }: { eventId: string }) {
       </div>
 
       {/* Trust Badges */}
-      <div className="mt-6 flex justify-center items-center gap-4 text-[9px] font-mono text-white/30 uppercase tracking-[0.2em]">
+      <div className="mt-6 flex justify-center items-center gap-4 text-[9px] font-mono text-muted-foreground uppercase tracking-[0.2em]">
         <span className="flex items-center gap-1.5">
-          <ShieldCheck size={12} className="text-green-500" /> Secure Frame
+          <ShieldCheck size={12} className="text-accent-teal" /> Secure Frame
         </span>
         <span className="flex items-center gap-1.5">
-          <Fingerprint size={12} className="text-[#c94a20]" /> Zero-Trust
+          <Fingerprint size={12} className="text-primary" /> Zero-Trust
         </span>
       </div>
     </div>

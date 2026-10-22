@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client } from '@/lib/aws';
+import { getEventAuthorization } from '@/lib/guest-session';
+import { deleteEventFacesForImage } from '@/lib/rekognition';
 
 export async function DELETE(
   req: Request,
@@ -10,6 +12,10 @@ export async function DELETE(
   const { eventId, assetId } = await params;
 
   try {
+    const { event, isOwner } = await getEventAuthorization(eventId);
+    if (!event) return NextResponse.json({ error: "Vault not found" }, { status: 404 });
+    if (!isOwner) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     // 1. Fetch asset and associated people before deletion
     const asset = await prisma.asset.findUnique({
       where: { id: assetId, eventId },
@@ -21,6 +27,18 @@ export async function DELETE(
     });
 
     if (!asset) return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    if (asset.status === "processing" || asset.status === "approving" || asset.status === "deleting") {
+      return NextResponse.json({ error: "Asset is currently being processed." }, { status: 409 });
+    }
+
+    const deletionClaim = await prisma.asset.updateMany({
+      where: { id: assetId, eventId, status: asset.status },
+      data: { status: "deleting" },
+    });
+    if (deletionClaim.count === 0) return NextResponse.json({ error: "Asset changed before deletion." }, { status: 409 });
+
+    // Remove biometric vectors before deleting their source asset.
+    await deleteEventFacesForImage(eventId, [asset.awsJobId, assetId].filter((id): id is string => !!id));
 
     // 2. Physical Layer: Delete from S3
     await s3Client.send(new DeleteObjectCommand({

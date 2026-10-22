@@ -28,38 +28,38 @@ export default function CreateEventModal({ isOpen, onClose }: { isOpen: boolean,
   return (
     <Portal>
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-[#0e0e0f] border border-white/10 w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+      <div className="bg-card text-card-foreground border border-border w-full max-w-md rounded-lg p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-serif font-bold text-white flex items-center gap-2">
-            <Sparkles className="text-[#c94a20]" size={20} /> New Event Vault
+          <h2 className="text-xl font-serif font-bold text-card-foreground flex items-center gap-2">
+            <Sparkles className="text-primary" size={20} /> New Event Vault
           </h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white"><X size={20} /></button>
+          <button onClick={onClose} aria-label="Close create event dialog" className="text-muted-foreground hover:text-foreground"><X size={20} /></button>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-mono uppercase text-white/30 tracking-widest">Event Name</label>
+            <label className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest">Event Name</label>
             <input 
               value={name} 
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Goa Wedding 2026" 
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-[#c94a20] outline-none transition-all" 
+              className="w-full bg-background border border-input rounded-md px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-all" 
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-mono uppercase text-white/30 tracking-widest">Guest Passcode</label>
+            <label className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest">Guest Passcode</label>
             <input 
               value={passcode} 
               onChange={(e) => setPasscode(e.target.value)}
               placeholder="e.g. GOA-VIBES" 
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono tracking-widest focus:border-[#c94a20] outline-none transition-all" 
+              className="w-full bg-background border border-input rounded-md px-4 py-3 text-foreground font-mono tracking-widest focus:border-primary outline-none transition-all" 
             />
           </div>
 
-          <div className="p-4 bg-[#c94a20]/10 border border-[#c94a20]/20 rounded-xl flex gap-3">
-            <ShieldCheck className="text-[#c94a20] shrink-0" size={18} />
-            <p className="text-[11px] text-[#c94a20]/80 leading-relaxed">
+          <div className="p-4 bg-primary/10 border border-primary/20 rounded-md flex gap-3">
+            <ShieldCheck className="text-primary shrink-0" size={18} />
+            <p className="text-[11px] text-foreground leading-relaxed">
               Creating this event will initialize a private biometric collection. All data will be isolated and encrypted.
             </p>
           </div>
@@ -67,7 +67,7 @@ export default function CreateEventModal({ isOpen, onClose }: { isOpen: boolean,
           <button 
             onClick={handleCreate}
             disabled={loading || !name || !passcode}
-            className="w-full bg-white text-black font-bold py-4 rounded-xl mt-4 hover:bg-gray-200 transition-all disabled:opacity-50"
+            className="w-full bg-primary text-primary-foreground font-bold py-4 rounded-md mt-4 hover:brightness-110 transition-all disabled:opacity-50"
           >
             {loading ? "Initializing Vault..." : "Create Event Vault"}
           </button>

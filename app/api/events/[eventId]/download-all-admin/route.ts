@@ -4,8 +4,7 @@ import { s3Client } from "@/lib/aws";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import archiver from "archiver";
 import { Readable, Writable } from "stream";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getEventAuthorization } from "@/lib/guest-session";
 
 export async function GET(
   req: NextRequest,
@@ -14,8 +13,9 @@ export async function GET(
   const { eventId } = await params;
   
   // 1. Secure the route (Admin Only)
-  const session = await getServerSession(authOptions);
-  if (!session) return new Response("Unauthorized Protocol", { status: 401 });
+  const { event, isOwner } = await getEventAuthorization(eventId);
+  if (!event) return new Response("Vault not found", { status: 404 });
+  if (!isOwner) return new Response("Unauthorized Protocol", { status: 401 });
 
   // 2. Fetch all assets for this vault
   const assets = await prisma.asset.findMany({
@@ -31,7 +31,7 @@ export async function GET(
   const archive = archiver("zip", { zlib: { level: 5 } });
   
   const nodeWritable = new Writable({
-    write(chunk: any, encoding: string, callback: (error?: Error | null) => void) {
+    write(chunk: Buffer, encoding: BufferEncoding, callback: (error?: Error | null) => void) {
       writer.write(chunk).then(() => callback()).catch((err) => callback(err));
     },
     final(callback: (error?: Error | null) => void) {

@@ -1,16 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, Loader2, CheckCheck, Trash2, User } from "lucide-react";
+import Image from "next/image";
+import { Check, Loader2, CheckCheck, Trash2, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion"; 
-import { cn } from "@/lib/utils";
 import { toast } from "sonner"; 
 
+interface GuestUpload {
+  id: string;
+  previewUrl: string | null;
+  sourceFilename: string | null;
+  uploaderName: string | null;
+  createdAt: string | Date;
+}
+
 export default function GuestUploadClient({ 
-  initialUploads, 
+  initialUploads,
   eventId 
 }: { 
-  initialUploads: any[], 
+  initialUploads: GuestUpload[],
   eventId: string 
 }) {
   const [uploads, setUploads] = useState(initialUploads);
@@ -18,6 +26,7 @@ export default function GuestUploadClient({
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const handleModeration = async (assetId: string, action: 'approve' | 'reject') => {
+    if (action === "reject" && !confirm("Permanently reject this upload and delete its biometric data?")) return;
     setProcessingId(assetId);
     try {
       const res = await fetch(`/api/admin/moderate-upload`, {
@@ -26,15 +35,17 @@ export default function GuestUploadClient({
         body: JSON.stringify({ assetId, action, eventId }),
       });
 
-      if (res.ok) {
-        setUploads((prev) => prev.filter((u) => u.id !== assetId));
-        toast.success(action === 'approve' ? "Asset Approved" : "Asset Rejected", {
-            description: action === 'approve' ? "Routing to AI pipeline." : "Asset deleted from vault.",
-        });
+      if (!res.ok) {
+        const result = await res.json().catch(() => null);
+        throw new Error(result?.error || `Moderation failed (${res.status})`);
       }
+      setUploads((prev) => prev.filter((u) => u.id !== assetId));
+      toast.success(action === 'approve' ? "Asset Approved" : "Asset Rejected", {
+        description: action === 'approve' ? "Routing to AI pipeline." : "Asset deleted from vault.",
+      });
     } catch (err) {
       console.error("Moderation failed", err);
-      toast.error("Moderation Failed");
+      toast.error(err instanceof Error ? err.message : "Moderation Failed");
     } finally {
       setProcessingId(null);
     }
@@ -46,17 +57,25 @@ export default function GuestUploadClient({
     const toastId = toast.loading("Processing Bulk Approval...");
     
     try {
-      await Promise.all(uploads.map(u => 
-        fetch(`/api/admin/moderate-upload`, {
+      const results = await Promise.all(uploads.map(async (upload) => {
+        const response = await fetch(`/api/admin/moderate-upload`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assetId: u.id, action: 'approve', eventId }),
-        })
-      ));
-      setUploads([]);
-      toast.success("Bulk Approval Complete", { id: toastId });
+          body: JSON.stringify({ assetId: upload.id, action: 'approve', eventId }),
+        });
+        return { id: upload.id, ok: response.ok };
+      }));
+      const approvedIds = new Set(results.filter((result) => result.ok).map((result) => result.id));
+      const failedCount = results.length - approvedIds.size;
+      setUploads((previous) => previous.filter((upload) => !approvedIds.has(upload.id)));
+      if (failedCount > 0) {
+        toast.error(`${failedCount} upload${failedCount === 1 ? "" : "s"} could not be approved.`, { id: toastId });
+      } else {
+        toast.success("Bulk Approval Complete", { id: toastId });
+      }
     } catch (error) {
-        toast.error("Bulk Approval Failed", { id: toastId });
+      console.error("[BULK_APPROVAL_ERROR]:", error);
+      toast.error("Bulk Approval Failed", { id: toastId });
     } finally {
       setIsBulkProcessing(false);
     }
@@ -66,14 +85,14 @@ export default function GuestUploadClient({
     <div className="space-y-6">
       {/* Bulk Actions Bar */}
       {uploads.length > 1 && (
-        <div className="flex justify-between items-center pb-2 border-b border-[#eceae4]">
-          <div className="text-[11px] font-mono text-[#5a5a64] uppercase tracking-widest">
+        <div className="flex justify-between items-center pb-2 border-b border-border">
+          <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
             {uploads.length} Assets Awaiting Review
           </div>
           <button 
             onClick={approveAll}
             disabled={isBulkProcessing}
-            className="flex items-center gap-2 px-4 py-2 bg-[#e6f5ee] text-[#2a7a4f] rounded-lg text-[12px] font-bold uppercase tracking-widest hover:bg-[#d1ebd9] transition-all disabled:opacity-50 active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 bg-accent-teal/10 text-accent-teal rounded-md text-[12px] font-bold uppercase tracking-widest hover:bg-accent-teal/20 transition-all disabled:opacity-50 active:scale-95"
           >
             {isBulkProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck size={16} />}
             Approve All
@@ -92,14 +111,22 @@ export default function GuestUploadClient({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
               transition={{ duration: 0.3 }}
-              className="bg-white border border-[#dbd8cf] rounded-2xl overflow-hidden flex flex-col group shadow-sm hover:shadow-xl hover:shadow-[#c94a20]/10 transition-all"
+              className="bg-card border border-border rounded-lg overflow-hidden flex flex-col group shadow-sm hover:shadow-lg hover:shadow-primary/10 transition-all"
             >
-              <div className="aspect-[4/3] relative bg-[#eceae4] overflow-hidden">
-                <img 
-                  src={asset.previewUrl} 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                  alt="Guest content" 
-                />
+              <div className="aspect-[4/3] relative bg-subtle overflow-hidden">
+                {asset.previewUrl ? (
+                  <Image
+                    src={asset.previewUrl}
+                    fill
+                    sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    alt="Guest content"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+                    Preview unavailable
+                  </div>
+                )}
                 
                 {/* ACTION OVERLAY (DESKTOP ONLY) */}
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden lg:flex items-center justify-center gap-6">
@@ -134,8 +161,8 @@ export default function GuestUploadClient({
                 )}
               </div>
               
-              <div className="p-4 bg-white z-10 flex-1 flex flex-col justify-between">
-                <p className="text-[12.5px] font-bold text-[#0e0e0f] truncate font-serif mb-3">
+              <div className="p-4 bg-card z-10 flex-1 flex flex-col justify-between">
+                <p className="text-[12.5px] font-bold text-card-foreground truncate font-serif mb-3">
                   {asset.sourceFilename}
                 </p>
 
@@ -151,22 +178,22 @@ export default function GuestUploadClient({
                   <button 
                     onClick={() => handleModeration(asset.id, 'approve')}
                     disabled={!!processingId || isBulkProcessing}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#e6f5ee] hover:bg-[#d1ebd9] text-[#2a7a4f] rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-accent-teal/10 hover:bg-accent-teal/20 text-accent-teal rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors active:scale-95 disabled:opacity-50"
                   >
                     <Check size={14} /> Approve
                   </button>
                 </div>
 
                 {/* Guest Uploader Tag */}
-                <div className="flex items-center justify-between mt-auto pt-3 border-t border-[#f5f4f0]">
-                    <div className="flex items-center gap-1.5 bg-[#f5f4f0] px-2 py-1 rounded-md border border-[#dbd8cf]/50">
-                        <User size={10} className="text-[#c94a20]" />
-                        <span className="text-[9px] font-mono text-[#5a5a64] uppercase tracking-widest truncate max-w-[100px]">
+                <div className="flex items-center justify-between mt-auto pt-3 border-t border-border">
+                  <div className="flex items-center gap-1.5 bg-subtle px-2 py-1 rounded-md border border-border">
+                    <User size={10} className="text-primary" />
+                    <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest truncate max-w-[100px]">
                             {asset.uploaderName || "Unknown Guest"}
                         </span>
                     </div>
 
-                    <span className="text-[9px] text-[#c8b89a] font-mono uppercase tracking-[0.1em]">
+                    <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-[0.1em]">
                         {new Date(asset.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                 </div>

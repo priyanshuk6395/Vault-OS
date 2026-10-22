@@ -97,12 +97,12 @@ export default function SideBar({ onClose }: SideBarProps) {
   ];
 
   return (
-    <aside className="w-[224px] min-w-[224px] bg-[#0e0e0f] h-screen flex flex-col border-r border-white/5 relative z-10 text-white/50">
-      <div className="p-5 border-b border-white/10">
-        <div className="font-serif text-[21px] text-white tracking-tight">
+    <aside className="w-56 min-w-56 bg-card h-screen flex flex-col border-r border-border relative z-10 text-muted-foreground">
+      <div className="p-5 border-b border-border">
+        <div className="font-serif text-[21px] text-foreground tracking-tight">
           Vault
         </div>
-        <div className="text-[9.5px] text-white/30 tracking-[0.15em] uppercase font-mono mt-0.5">
+        <div className="text-[9.5px] text-muted-foreground tracking-[0.15em] uppercase font-mono mt-0.5">
           Event Media OS
         </div>
       </div>
@@ -117,7 +117,7 @@ export default function SideBar({ onClose }: SideBarProps) {
           return item.isLabel ? (
             <div
               key={idx}
-              className="text-[9px] font-mono tracking-[0.14em] uppercase text-white/20 px-[18px] pt-[10px] pb-[3px]"
+              className="text-[9px] font-mono tracking-[0.14em] uppercase text-muted-foreground px-[18px] pt-[10px] pb-[3px]"
             >
               {item.label}
             </div>
@@ -127,9 +127,9 @@ export default function SideBar({ onClose }: SideBarProps) {
               href={item.href!}
               onClick={onClose}
               className={cn(
-                "flex items-center gap-[9px] px-[18px] py-[8px] text-[12.5px] transition-all border-l-2 border-transparent hover:bg-white/5 hover:text-white/80",
+                "flex items-center gap-[9px] px-[18px] py-[8px] text-[12.5px] transition-all border-l-2 border-transparent hover:bg-subtle hover:text-foreground",
                 pathname === item.href &&
-                  "bg-white/10 text-white border-[#c94a20]",
+                  "bg-subtle text-foreground border-primary",
               )}
             >
               {/* 2. Render using the capitalized alias */}
@@ -137,13 +137,13 @@ export default function SideBar({ onClose }: SideBarProps) {
                 <Icon
                   className={cn(
                     "w-4 h-4 opacity-70",
-                    pathname === item.href && "text-[#c94a20] opacity-100",
+                    pathname === item.href && "text-primary opacity-100",
                   )}
                 />
               )}
               <span>{item.label}</span>
               {(item.badge ?? 0) > 0 && (
-                <span className="ml-auto bg-[#c94a20] text-white text-[9px] font-mono px-1.5 py-0.5 rounded-full">
+                <span className="ml-auto bg-primary text-primary-foreground text-[9px] font-mono px-1.5 py-0.5 rounded-full">
                   {item.badge}
                 </span>
               )}
@@ -151,13 +151,13 @@ export default function SideBar({ onClose }: SideBarProps) {
           );
         })}
       </nav>
-      <div className="p-4 border-t border-white/10 space-y-1 bg-white/[0.02] shrink-0">
+      <div className="p-4 border-t border-border space-y-1 bg-subtle shrink-0">
         <Link
           href="/admin"
           onClick={onClose}
-          className="flex items-center gap-3 px-3 py-2.5 text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/5 rounded-xl transition-all group"
+          className="flex items-center gap-3 px-3 py-2.5 text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-lg transition-all group"
         >
-          <div className="p-1.5 rounded-md bg-white/5 group-hover:bg-white/10 transition-colors">
+          <div className="p-1.5 rounded-md bg-background group-hover:bg-card transition-colors">
             <Home
               size={14}
               className="group-hover:scale-110 transition-transform"
@@ -168,9 +168,9 @@ export default function SideBar({ onClose }: SideBarProps) {
 
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="w-full flex items-center gap-3 px-3 py-2.5 text-[12px] font-medium text-white/50 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all group"
+          className="w-full flex items-center gap-3 px-3 py-2.5 text-[12px] font-medium text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all group"
         >
-          <div className="p-1.5 rounded-md bg-white/5 group-hover:bg-red-500/20 transition-colors text-red-400/50 group-hover:text-red-400">
+          <div className="p-1.5 rounded-md bg-background group-hover:bg-red-500/20 transition-colors text-red-500/60 group-hover:text-red-500">
             <LogOut
               size={14}
               className="group-hover:scale-110 transition-transform"

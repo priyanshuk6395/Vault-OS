@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getEventAuthorization } from '@/lib/guest-session';
 
 export async function POST(
   req: Request,
@@ -8,6 +9,9 @@ export async function POST(
   const { eventId } = await params;
 
   try {
+    const { event, isOwner } = await getEventAuthorization(eventId);
+    if (!event) return NextResponse.json({ error: "Vault not found" }, { status: 404 });
+    if (!isOwner) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     // Find all people in this event who have ZERO face detections
     const deleted = await prisma.person.deleteMany({
       where: {

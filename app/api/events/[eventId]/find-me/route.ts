@@ -2,11 +2,21 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { GetFaceLivenessSessionResultsCommand, SearchFacesByImageCommand } from '@aws-sdk/client-rekognition';
 import { rekognitionClient } from '@/lib/aws';
+import { getEventAuthorization, issueGuestPersonCookie } from '@/lib/guest-session';
 
 export async function POST(req: Request, { params }: { params: Promise<{ eventId: string }> }) {
   try {
     const { eventId } = await params;
     const { sessionId } = await req.json();
+    if (typeof sessionId !== "string" || !sessionId) {
+      return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
+    }
+    const { event, isOwner, isGuest } = await getEventAuthorization(eventId);
+    if (!event) return NextResponse.json({ error: "Vault not found" }, { status: 404 });
+    if (!isOwner && !isGuest) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (isGuest && !event.biometricSearch) {
+      return NextResponse.json({ error: "Biometric search is disabled for this vault." }, { status: 403 });
+    }
 
     // 1. GET LIVENESS RESULTS FROM AWS
     const livenessResult = await rekognitionClient.send(
@@ -48,14 +58,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
     }
 
     const matchedFaceId = searchResponse.FaceMatches[0].Face?.FaceId;
+    if (!matchedFaceId) return NextResponse.json({ error: "Matching face record is incomplete." }, { status: 404 });
 
     // 4. IDENTIFY THE PERSON
-    const detection = await prisma.faceDetection.findUnique({
-      where: { faceId: matchedFaceId },
+    const detection = await prisma.faceDetection.findFirst({
+      where: { faceId: matchedFaceId, asset: { eventId } },
       include: { person: true }
     });
 
     if (!detection) return NextResponse.json({ error: "Identity found in AWS but not in DB." }, { status: 404 });
+    if (isGuest) await issueGuestPersonCookie(eventId, detection.personId, undefined, event.passcode);
 
     // 5. FETCH THEIR ASSETS
     const myPhotos = await prisma.asset.findMany({

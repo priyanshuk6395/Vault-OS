@@ -47,7 +47,7 @@ export default function GuestGalleryClient({
   return (
     <div className="flex-1 flex flex-col">
       {/* 1. TACTICAL TAB NAVIGATION */}
-      <div className="flex items-center p-1.5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl w-full sm:w-fit mb-10 relative z-20 shadow-2xl">
+      <div className="flex items-center p-1.5 bg-card border border-border rounded-lg w-full sm:w-fit mb-10 relative z-20 shadow-sm">
         <TabButton
           isActive={activeTab === "matches"}
           onClick={() => setActiveTab("matches")}
@@ -72,8 +72,8 @@ export default function GuestGalleryClient({
           className={cn(
             "flex items-center gap-3 px-6 py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all duration-500 border",
             isDownloading
-              ? "bg-[#c94a20] border-[#c94a20] text-white animate-pulse"
-              : "bg-white/5 border-white/10 text-white hover:bg-white hover:text-black hover:border-white shadow-xl",
+              ? "bg-primary border-primary text-primary-foreground animate-pulse"
+              : "bg-card border-border text-foreground hover:bg-subtle shadow-sm",
           )}
         >
           {isDownloading ? (
@@ -102,48 +102,48 @@ export default function GuestGalleryClient({
               <ImageGrid photos={currentData} />
             ) : (
               /* EMPTY STATE: BIOMETRIC TELEMETRY LOOK */
-              <div className="h-[45vh] min-h-[350px] flex flex-col items-center justify-center border border-white/5 rounded-[48px] bg-gradient-to-b from-white/[0.03] to-transparent backdrop-blur-md shadow-2xl relative overflow-hidden group">
+              <div className="h-[45vh] min-h-[350px] flex flex-col items-center justify-center border border-border rounded-xl bg-linear-to-b from-subtle to-background shadow-sm relative overflow-hidden group">
                 {/* Subtle Grid Pattern Overlay */}
                 <div
                   className="absolute inset-0 opacity-[0.05] pointer-events-none"
                   style={{
                     backgroundImage:
-                      "radial-gradient(#fff 1px, transparent 1px)",
+                      "radial-gradient(var(--foreground) 1px, transparent 1px)",
                     backgroundSize: "24px 24px",
                   }}
                 />
 
                 <div className="relative mb-8">
                   {/* Outer Pulsing Ring */}
-                  <div className="absolute inset-0 rounded-full bg-[#c94a20]/20 animate-ping" />
+                    <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
 
-                  <div className="relative w-20 h-20 bg-[#0d0d0f] border border-[#c94a20]/30 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(201,74,32,0.2)]">
+                  <div className="relative w-20 h-20 bg-card border border-primary/30 rounded-full flex items-center justify-center shadow-lg shadow-primary/20">
                     {activeTab === "uploads" ? (
-                      <ImagePlus size={32} className="text-[#c94a20]" />
+                      <ImagePlus size={32} className="text-primary" />
                     ) : (
-                      <Fingerprint size={32} className="text-[#c94a20]" />
+                      <Fingerprint size={32} className="text-primary" />
                     )}
                   </div>
                 </div>
 
                 <div className="text-center space-y-3 px-6 relative z-10">
-                  <h3 className="font-serif text-2xl sm:text-3xl text-white font-bold tracking-tight">
+                  <h3 className="font-serif text-2xl sm:text-3xl text-foreground font-bold tracking-tight">
                     {activeTab === "uploads"
                       ? "Archive Empty"
                       : "Identity Scanning"}
                   </h3>
 
                   <div className="flex items-center justify-center gap-4">
-                    <div className="h-[1px] w-8 bg-white/10" />
-                    <p className="text-[#c94a20] text-[10px] font-mono uppercase tracking-[0.3em] font-bold">
+                    <div className="h-[1px] w-8 bg-border" />
+                    <p className="text-primary text-[10px] font-mono uppercase tracking-[0.3em] font-bold">
                       {activeTab === "uploads"
                         ? "Awaiting Data"
                         : "Active Ingestion"}
                     </p>
-                    <div className="h-[1px] w-8 bg-white/10" />
+                    <div className="h-[1px] w-8 bg-border" />
                   </div>
 
-                  <p className="text-white/40 text-[11px] font-mono uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                  <p className="text-muted-foreground text-[11px] font-mono uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
                     {activeTab === "uploads"
                       ? "The vault has no records of your uploads. Initialize transfer to begin."
                       : `The biometric engine is cross-referencing ${eventTitle} with your profile.`}
@@ -159,7 +159,7 @@ export default function GuestGalleryClient({
                       duration: 2,
                       ease: "linear",
                     }}
-                    className="absolute top-0 left-0 w-1/2 h-[1px] bg-gradient-to-r from-transparent via-[#c94a20] to-transparent opacity-50"
+                    className="absolute top-0 left-0 w-1/2 h-[1px] bg-linear-to-r from-transparent via-primary to-transparent opacity-50"
                   />
                 )}
               </div>
@@ -178,7 +178,7 @@ function TabButton({ isActive, onClick, icon, label, count }: any) {
       onClick={onClick}
       className={cn(
         "relative flex items-center gap-3 px-6 py-3 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-500 z-10 group",
-        isActive ? "text-white" : "text-white/30 hover:text-white/60",
+        isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
       )}
     >
       {icon}
@@ -190,8 +190,8 @@ function TabButton({ isActive, onClick, icon, label, count }: any) {
           className={cn(
             "ml-1 text-[9px] px-1.5 py-0.5 rounded-md border transition-colors",
             isActive
-              ? "bg-white/10 border-white/20 text-white"
-              : "bg-transparent border-white/5 text-white/20",
+              ? "bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground"
+              : "bg-transparent border-border text-muted-foreground",
           )}
         >
           {count}
@@ -201,7 +201,7 @@ function TabButton({ isActive, onClick, icon, label, count }: any) {
       {isActive && (
         <motion.div
           layoutId="activeTab"
-          className="absolute inset-0 bg-[#c94a20] rounded-xl shadow-[0_0_20px_rgba(201,74,32,0.4)] z-[-1]"
+          className="absolute inset-0 bg-primary rounded-md shadow-lg shadow-primary/20 z-[-1]"
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
         />
       )}

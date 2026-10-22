@@ -4,6 +4,7 @@ import { s3Client } from "@/lib/aws";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import archiver from "archiver";
 import { Readable, Writable } from "stream";
+import { getGuestPersonId } from "@/lib/guest-session";
 
 // Helper function to sanitize names for Windows/Mac file systems
 function sanitizeFilenamePart(name: string) {
@@ -19,6 +20,7 @@ export async function GET(
   const personId = searchParams.get("personId");
 
   if (!personId) return new Response("Unauthorized", { status: 401 });
+  if (await getGuestPersonId(eventId) !== personId) return new Response("Unauthorized", { status: 401 });
 
   // 1. Resolve guest and event data correctly using Prisma relation filters
   const guestData = await prisma.person.findUnique({
@@ -70,7 +72,7 @@ export async function GET(
   const archive = archiver("zip", { zlib: { level: 5 } });
   
   const nodeWritable = new Writable({
-    write(chunk: any, encoding: string, callback: (error?: Error | null) => void) {
+    write(chunk: Buffer, encoding: BufferEncoding, callback: (error?: Error | null) => void) {
       writer.write(chunk).then(() => callback()).catch(callback);
     },
     final(callback: (error?: Error | null) => void) {

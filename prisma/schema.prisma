@@ -110,4 +110,6 @@ model AccessLog {
   userAgent   String?
   
   createdAt   DateTime @default(now())
+
+  @@index([eventId, action, ipAddress, createdAt])
 }

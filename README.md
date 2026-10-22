@@ -166,25 +166,24 @@ Visit `http://localhost:3000/login` for the admin console, or `http://localhost:
 | `npm run build` | Production build |
 | `npm run start` | Run the production build |
 | `npm run lint` | ESLint |
+| `npm test` | Run unit tests once with Vitest |
+| `npm run test:watch` | Run Vitest in watch mode |
+| `npm run test:e2e` | Run Playwright browser tests |
 | `npx prisma studio` | Browse the database in a GUI |
 | `npx prisma db push` | Push schema changes to the DB without a migration file |
 | `npx prisma generate` | Regenerate the Prisma Client after any `schema.prisma` change |
 
-> ⚠️ **`npm run build` does not currently run `prisma generate` first.** If you change `schema.prisma` and build without regenerating, you'll get a confusing TypeScript error claiming a field "does not exist" even though it's right there in the schema. Until this is fixed in `package.json`, run `npx prisma generate` manually before building, or update the script yourself:
-> ```json
-> "build": "prisma generate && next build"
-> ```
+`npm run build` generates the Prisma Client before building. After changing `schema.prisma`, run `npx prisma db push` (or your migration workflow) to update the database schema.
 
 ---
 
-## Known issues / things to fix
+## Security and media behavior
 
-These are real, currently-unresolved items found while working on this codebase — flagging them here so they don't get rediscovered the hard way:
-
-- **`lib/actions/guest-actions.ts`** — the guest session cookie sets `secure: process.env.NODE_NODE === "production"`. That's a typo (`NODE_ENV`, not `NODE_NODE`), so the condition is always `false` and the cookie never gets the `Secure` flag in production.
-- **`/api/upload/view`** has no auth check of its own. It isn't under `middleware.ts`'s `/admin/:path*` matcher, so anyone with a valid `storageKey` can fetch that photo directly, bypassing event passcodes and moderation state. Worth deciding whether that's acceptable for your privacy model.
-- **EXIF orientation**: uploaded photos aren't normalized server-side. Sideways/rotated uploads can look wrong in square thumbnail crops until this is handled at upload time.
-- **`next/image` + the S3 proxy**: `/api/upload/view` must return real image bytes, not a redirect to a signed S3 URL — `next.config.ts`'s `images.localPatterns` only works correctly against a same-origin route that responds with actual image data.
+- Guest access uses signed, expiring, event-scoped HttpOnly cookies. The upload and media APIs validate event ownership or guest access before accepting uploads or returning private media.
+- Passcode verification is rate-limited by event and client IP. Production reverse proxies must overwrite `X-Real-IP`; the application intentionally ignores untrusted `X-Forwarded-For` values.
+- Image uploads are converted to WebP in the browser. The server rotates images for EXIF orientation, can resize/convert previews, and converts WebP to JPEG bytes before Rekognition indexing.
+- Private event images use private, non-cacheable proxy responses so revoked event access is not bypassed by a public cache.
+- Video uploads are stored and moderated but are not submitted to Rekognition face indexing.
 
 ---
 

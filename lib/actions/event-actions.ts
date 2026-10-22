@@ -2,27 +2,27 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
 import { rekognitionClient,s3Client } from "@/lib/aws";
 import { DeleteCollectionCommand, DescribeCollectionCommand } from "@aws-sdk/client-rekognition";
-import { GetBucketLocationCommand,ListObjectsV2Command,ListObjectsV2CommandInput, DeleteObjectsCommand, DeleteObjectsCommandInput} from "@aws-sdk/client-s3";
-import { cookies } from "next/headers";
+import { GetBucketLocationCommand,ListObjectsV2Command,ListObjectsV2CommandInput, DeleteObjectsCommand} from "@aws-sdk/client-s3";
 import { redirect } from "next/navigation";
+import { clearGuestSessionCookies, getEventAuthorization } from "@/lib/guest-session";
+import { encryptEventPasscode, generateEventPasscode, verifyEventPasscode } from "@/lib/passcode";
 
 export async function rotateEventPasscode(eventId: string) {
-  const session = await getServerSession();
-  if (!session) throw new Error("Unauthorized");
+  const { event, isOwner } = await getEventAuthorization(eventId);
+  if (!event || !isOwner) throw new Error("Unauthorized");
 
   // Generate a new 8-character uppercase passcode
-  const newPasscode = Math.random().toString(36).substring(2, 10).toUpperCase();
+  const newPasscode = generateEventPasscode();
 
   try {
     await prisma.event.update({
       where: { 
         id: eventId,
-        ownerId: session.user.id // Security: Ensure only the owner can rotate
+        ownerId: event.ownerId // Security: Ensure only the owner can rotate
       },
-      data: { passcode: newPasscode },
+      data: { passcode: encryptEventPasscode(newPasscode) },
     });
 
     // Refresh the page data immediately
@@ -38,12 +38,14 @@ export async function rotateEventPasscode(eventId: string) {
  * Aggregates database metrics and pings AWS services for a live health check.
  */
 export async function getEventSettings(eventId: string) {
+  const { event, isOwner } = await getEventAuthorization(eventId);
+  if (!event || !isOwner) return null;
+
   const eventData = await prisma.event.findUnique({
     where: { id: eventId },
     select: {
       id: true,
       title: true,
-      passcode: true,
       createdAt: true,
       _count: {
         select: {
@@ -77,9 +79,9 @@ export async function getEventSettings(eventId: string) {
       await s3Client.send(new GetBucketLocationCommand({ Bucket: bucketName }));
       health.s3 = true;
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     // Removed the non-existent 'file.name' reference that caused the crash
-    console.error(`S3_HEALTH_ERROR for Event ${eventId}:`, e.name, e.message);
+    console.error(`S3_HEALTH_ERROR for Event ${eventId}:`, e);
     health.s3 = false;
   }
 
@@ -88,7 +90,8 @@ export async function getEventSettings(eventId: string) {
     const collectionId = `event-${eventId}`;
     await rekognitionClient.send(new DescribeCollectionCommand({ CollectionId: collectionId }));
     health.rekognition = true;
-  } catch (e) { 
+  } catch (e) {
+    console.warn(`[REKOGNITION_HEALTH_ERROR] Event ${eventId}:`, e);
     health.rekognition = false; 
   }
 
@@ -100,8 +103,15 @@ export async function getEventSettings(eventId: string) {
 /**
  * Purges the entire event infrastructure including AWS Collections and local DB records.
  */
-export async function deleteEvent(eventId: string) {
+export async function deleteEvent(eventId: string, confirmationPasscode: string) {
   try {
+    const { event, isOwner } = await getEventAuthorization(eventId);
+    if (!event || !isOwner) throw new Error("Unauthorized");
+    const storedPasscode = await prisma.event.findUnique({ where: { id: eventId }, select: { passcode: true } });
+    if (!storedPasscode || !(await verifyEventPasscode(confirmationPasscode, storedPasscode.passcode))) {
+      return { error: "Passcode confirmation failed." };
+    }
+
     const bucketName = process.env.AWS_S3_BUCKET;
     if (!bucketName) throw new Error("AWS_S3_BUCKET environment variable is missing.");
 
@@ -128,7 +138,10 @@ export async function deleteEvent(eventId: string) {
             Quiet: true, // Prevents returning a massive list of deleted items
           },
         });
-        await s3Client.send(deleteParams);
+        const deletion = await s3Client.send(deleteParams);
+        if (deletion.Errors?.length) {
+          throw new Error(`S3 failed to delete ${deletion.Errors.length} event objects.`);
+        }
       }
 
       isTruncated = listResponse.IsTruncated ?? false;
@@ -139,8 +152,9 @@ export async function deleteEvent(eventId: string) {
     const collectionId = `event-${eventId}`;
     try {
       await rekognitionClient.send(new DeleteCollectionCommand({ CollectionId: collectionId }));
-    } catch (e) { 
-      console.warn(`[Vault OS] Collection ${collectionId} missing or already purged.`); 
+    } catch (error) {
+      if (!(error instanceof Error) || error.name !== "ResourceNotFoundException") throw error;
+      console.info(`[Vault OS] Collection ${collectionId} was already absent.`);
     }
 
     // 3. PURGE DATABASE RECORDS
@@ -154,17 +168,14 @@ export async function deleteEvent(eventId: string) {
     revalidatePath("/admin");
     
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[CRITICAL_PURGE_ERROR]:", error);
-    return { error: error.message || "Failed to execute infrastructure purge protocol." };
+    return { error: error instanceof Error ? error.message : "Failed to execute infrastructure purge protocol." };
   }
 }
 
 export async function logoutGuest(eventId: string) {
-  const cookieStore = await cookies();
-  
-  // Delete the specific event authorization cookie
-  cookieStore.delete(`event_auth_${eventId}`);
+  await clearGuestSessionCookies(eventId);
   
   // Redirect to the entry gate
   redirect(`/guest/event/${eventId}`);

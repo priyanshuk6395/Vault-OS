@@ -31,7 +31,7 @@ export default function PurgeButton({ eventId }: { eventId: string }) {
     <button 
       onClick={handlePurge}
       disabled={loading}
-      className="inline-flex items-center gap-2 text-[10px] font-bold text-[#c94a20] border border-[#c94a20]/20 px-3 py-1.5 rounded-full hover:bg-[#c94a20] hover:text-white transition-all disabled:opacity-50 mt-4"
+      className="inline-flex items-center gap-2 text-[10px] font-bold text-primary border border-primary/20 px-3 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all disabled:opacity-50 mt-4"
     >
       {loading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
       Purge Orphans

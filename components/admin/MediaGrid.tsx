@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion"; // <-- Added AnimatePresence
+import Image from "next/image";
 import {
   X,
   ExternalLink,
@@ -16,14 +17,34 @@ import {
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
+export interface MediaAsset {
+  id: string;
+  sourceFilename: string | null;
+  storageKey: string;
+  status: string;
+  moderationState: string;
+  url: string | null;
+  uploader?: { name: string; role: string };
+}
+
+interface AdminGridItemProps {
+  asset: MediaAsset;
+  onClick: () => void;
+  onDelete: (id: string) => Promise<void>;
+  isDeleting: boolean;
+  isEditing?: boolean;
+  isSelected?: boolean;
+  onSelect?: (id: string) => void;
+}
+
 // --- Sub-component for individual grid images ---
-function AdminGridItem({ asset, onClick, onDelete, isDeleting, isEditing, isSelected, onSelect }: any) {
+function AdminGridItem({ asset, onClick, onDelete, isDeleting, isEditing, isSelected, onSelect }: AdminGridItemProps) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isEditing) {
       e.stopPropagation();
-      onSelect(asset.id);
+      onSelect?.(asset.id);
     } else {
       onClick();
     }
@@ -36,18 +57,18 @@ function AdminGridItem({ asset, onClick, onDelete, isDeleting, isEditing, isSele
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
       onClick={handleClick}
       className={cn(
-        "group bg-white border rounded-2xl overflow-hidden cursor-pointer transition-all relative flex flex-col",
-        isSelected ? "border-[#c94a20] shadow-[0_0_0_2px_#c94a20] scale-[0.98]" : "border-[#dbd8cf] hover:shadow-xl hover:shadow-[#c94a20]/10"
+        "group bg-card text-card-foreground border rounded-lg overflow-hidden cursor-pointer transition-all relative flex flex-col",
+        isSelected ? "border-primary shadow-[0_0_0_2px_var(--primary)] scale-[0.98]" : "border-border hover:shadow-lg hover:shadow-primary/10"
       )}
     >
-      <div className="aspect-[4/3] bg-[#eceae4] relative flex items-center justify-center overflow-hidden">
+      <div className="aspect-[4/3] bg-subtle relative flex items-center justify-center overflow-hidden">
         
         {/* Bulk Select Overlay Checkbox */}
         {isEditing && (
           <div className="absolute top-3 left-3 z-40">
             <div className={cn(
               "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300", 
-              isSelected ? "bg-[#c94a20] border-[#c94a20] text-white" : "bg-black/30 border-white/70 backdrop-blur-sm"
+              isSelected ? "bg-primary border-primary text-primary-foreground" : "bg-black/30 border-white/70 backdrop-blur-sm"
             )}>
               {isSelected && <Check size={14} strokeWidth={3} />}
             </div>
@@ -55,15 +76,17 @@ function AdminGridItem({ asset, onClick, onDelete, isDeleting, isEditing, isSele
         )}
         {/* Loading Skeleton */}
         {!isLoaded && asset.url && (
-          <div className="absolute inset-0 bg-gradient-to-br from-[#f5f4f0] to-[#eceae4] flex items-center justify-center animate-pulse z-0">
-            <Loader2 className="w-5 h-5 text-[#c8b89a] animate-spin" />
+          <div role="status" className="absolute inset-0 bg-linear-to-br from-subtle to-background flex items-center justify-center animate-pulse z-0">
+            <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
           </div>
         )}
 
         {asset.url ? (
-          <img
+          <Image
             src={asset.url}
             alt={asset.sourceFilename || "Event Photo"}
+            fill
+            sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
             loading="lazy"
             decoding="async"
             onLoad={() => setIsLoaded(true)}
@@ -74,7 +97,7 @@ function AdminGridItem({ asset, onClick, onDelete, isDeleting, isEditing, isSele
             )}
           />
         ) : (
-          <div className="flex flex-col items-center gap-2 text-[#c8b89a] z-10">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground z-10">
             <ImageIcon size={24} />
             <span className="text-[10px] font-mono uppercase">No Preview</span>
           </div>
@@ -94,27 +117,27 @@ function AdminGridItem({ asset, onClick, onDelete, isDeleting, isEditing, isSele
         </button>
       </div>
 
-      <div className="p-3 bg-white z-10 border-t border-[#f5f4f0] flex-1 flex flex-col justify-between">
-        <div className="text-[11.5px] font-bold truncate text-[#0e0e0f] mb-1 font-serif">
+      <div className="p-3 bg-card z-10 border-t border-border flex-1 flex flex-col justify-between">
+        <div className="text-[11.5px] font-bold truncate text-card-foreground mb-1 font-serif">
           {asset.sourceFilename}
         </div>
         
         {/* Uploader Name Tag */}
-        <div className="flex items-center gap-1.5 text-[9px] font-mono text-[#5a5a64] uppercase tracking-widest mb-2">
-          <User size={10} className="text-[#c8b89a] shrink-0" /> 
+        <div className="flex items-center gap-1.5 text-[9px] font-mono text-muted-foreground uppercase tracking-widest mb-2">
+          <User size={10} className="text-accent-amber shrink-0" />
           <span className="truncate">{asset.uploader?.name || "System Ingestion"}</span>
         </div>
 
         <div className="flex items-center justify-between mt-auto">
           <span className={cn(
             "text-[9px] px-1.5 py-0.5 rounded-sm font-mono font-bold uppercase tracking-tighter",
-            asset.status === "processed" ? "bg-[#e6f5ee] text-[#2a7a4f]" : "bg-[#f5f4f0] text-[#5a5a64]"
+            asset.status === "processed" ? "bg-accent-teal/10 text-accent-teal" : "bg-subtle text-muted-foreground"
           )}>
             AI: {asset.status === "processed" ? "DONE" : asset.status}
           </span>
           <span className={cn(
             "text-[9px] px-1.5 py-0.5 rounded-sm font-mono font-bold uppercase tracking-tighter",
-            asset.moderationState === "approved" ? "bg-[#e6f5ee] text-[#2a7a4f]" : "bg-[#fdf2e0] text-[#a06010]"
+            asset.moderationState === "approved" ? "bg-accent-teal/10 text-accent-teal" : "bg-accent-amber/10 text-accent-amber"
           )}>
             MOD: {asset.moderationState === "approved" ? "OK" : "PENDING"}
           </span>
@@ -132,13 +155,13 @@ export default function MediaGrid({
   selectedIds,
   onSelect
 }: {
-  assets: any[];
+  assets: MediaAsset[];
   onDelete: (id: string) => Promise<void>;
   isEditing?: boolean;
   selectedIds?: Set<string>;
   onSelect?: (id: string) => void;
 }) {
-  const [selectedAsset, setSelectedAsset] = useState<any>(null);
+  const [selectedAsset, setSelectedAsset] = useState<MediaAsset | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [lightboxLoaded, setLightboxLoaded] = useState(false);
   
@@ -255,7 +278,7 @@ export default function MediaGrid({
               
               {!lightboxLoaded && selectedAsset?.url && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-0">
-                  <Loader2 className="animate-spin text-[#c94a20]" size={32} />
+                  <Loader2 className="animate-spin text-accent-coral" size={32} />
                   <span className="text-white/40 font-mono text-[10px] uppercase tracking-widest">Decrypting Asset...</span>
                 </div>
               )}
@@ -292,18 +315,20 @@ export default function MediaGrid({
                       else if (x > (rect.width * 2) / 3) handleNext();
                     }}
                   >
-                    <img
+                    <Image
                       src={selectedAsset.url}
+                      alt="Full preview"
+                      fill
+                      sizes="100vw"
                       className={cn(
                         "max-h-[85vh] max-w-full object-contain select-none rounded-xl shadow-2xl transition-opacity duration-300 z-10 pointer-events-none",
                         lightboxLoaded ? "opacity-100" : "opacity-0"
                       )}
                       onLoad={() => setLightboxLoaded(true)}
-                      alt="Full preview"
                     />
                   </motion.div>
                 ) : (
-                  <div className="text-[#c8b89a] flex flex-col items-center gap-2">
+                  <div className="text-muted-foreground flex flex-col items-center gap-2">
                     <ImageIcon size={48} opacity={0.5} />
                     <span className="text-[12px] font-mono uppercase">Asset Unavailable</span>
                   </div>
@@ -329,7 +354,7 @@ export default function MediaGrid({
 
                   <span className={cn(
                     "text-[10px] font-mono uppercase tracking-widest px-2 py-1 rounded font-bold",
-                    selectedAsset?.moderationState === "approved" ? "text-[#2a7a4f] bg-[#e6f5ee]/20" : "text-[#a06010] bg-[#fdf2e0]/20"
+                    selectedAsset?.moderationState === "approved" ? "text-accent-teal bg-accent-teal/10" : "text-accent-amber bg-accent-amber/10"
                   )}>
                     MOD: {selectedAsset?.moderationState}
                   </span>
@@ -338,14 +363,15 @@ export default function MediaGrid({
 
               <div className="flex items-center gap-3 w-full sm:w-auto shrink-0 pointer-events-auto">
                 <button
-                  onClick={() => window.open(selectedAsset?.url, "_blank")}
+                  onClick={() => { if (selectedAsset?.url) window.open(selectedAsset.url, "_blank"); }}
+                  disabled={!selectedAsset?.url}
                   className="flex-1 sm:flex-none justify-center px-5 py-3 bg-white/10 hover:bg-white hover:text-black text-white rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2"
                 >
                   <ExternalLink size={14} /> <span className="hidden sm:inline">Open Original</span>
                 </button>
                 <button
-                  onClick={() => handleDeleteClick(selectedAsset?.id)}
-                  disabled={isDeleting === selectedAsset?.id}
+                  onClick={() => { if (selectedAsset) void handleDeleteClick(selectedAsset.id); }}
+                  disabled={!selectedAsset || isDeleting === selectedAsset.id}
                   className="flex-1 sm:flex-none justify-center px-5 py-3 bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2"
                 >
                   {isDeleting === selectedAsset?.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}

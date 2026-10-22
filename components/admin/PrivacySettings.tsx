@@ -14,29 +14,29 @@ export default function PrivacySettings({ event }: { event: any }) {
   };
 
   return (
-    <ul className="text-[13px] space-y-4 text-[#5a5a64] flex-1">
-      <li className="flex justify-between items-center border-b border-[#f5f4f0] pb-2">
+    <ul className="text-[13px] space-y-4 text-muted-foreground flex-1">
+      <li className="flex justify-between items-center border-b border-border pb-2">
         <span>Biometric Search</span> 
         <button 
           onClick={() => toggle("biometricSearch", event.biometricSearch)}
           disabled={loading === "biometricSearch"}
           className={cn(
             "px-2 py-0.5 rounded text-[10px] font-bold transition-all",
-            event.biometricSearch ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+            event.biometricSearch ? "bg-accent-teal/15 text-accent-teal" : "bg-subtle text-muted-foreground"
           )}
         >
           {event.biometricSearch ? "ACTIVE" : "DISABLED"}
         </button>
       </li>
       
-      <li className="flex justify-between items-center border-b border-[#f5f4f0] pb-2">
+      <li className="flex justify-between items-center border-b border-border pb-2">
         <span>Public Gallery</span> 
         <button 
           onClick={() => toggle("publicGallery", event.publicGallery)}
           disabled={loading === "publicGallery"}
           className={cn(
             "px-2 py-0.5 rounded text-[10px] font-bold transition-all",
-            event.publicGallery ? "bg-[#c94a20]/10 text-[#c94a20]" : "bg-gray-100 text-gray-400"
+            event.publicGallery ? "bg-primary/10 text-primary" : "bg-subtle text-muted-foreground"
           )}
         >
           {event.publicGallery ? "PUBLIC" : "PRIVATE"}

@@ -1,23 +1,27 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { CreateCollectionCommand } from "@aws-sdk/client-rekognition";
-import { rekognitionClient } from "@/lib/aws";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { initializeEventCollection } from "@/lib/rekognition";
+import { encryptEventPasscode } from "@/lib/passcode";
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession();
-    if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { name, passcode } = await req.json();
-    const ownerId = "priyanshuk6395";
+    if (typeof name !== "string" || !name.trim() || typeof passcode !== "string" || passcode.trim().length < 4) {
+      return NextResponse.json({ error: "A title and passcode of at least 4 characters are required." }, { status: 400 });
+    }
+    const ownerId = session.user.id;
 
     // 1. Create the Event in Prisma
     const newEvent = await prisma.event.create({
       data: {
         title:name,
-        passcode,
+        passcode: encryptEventPasscode(passcode),
         ownerId,
       }
     });
@@ -25,15 +29,20 @@ export async function POST(req: Request) {
     // 2. Initialize Biometric Isolation (AWS Benchmark)
     // Every event gets its own dedicated Rekognition Collection
     try {
-      await rekognitionClient.send(
-        new CreateCollectionCommand({ CollectionId: newEvent.id })
-      );
+      await initializeEventCollection(newEvent.id);
     } catch (rekogError) {
       console.error("AWS Collection creation failed:", rekogError);
       // We keep the event but log the error for manual retry
     }
 
-    return NextResponse.json(newEvent);
+    return NextResponse.json({
+      id: newEvent.id,
+      title: newEvent.title,
+      ownerId: newEvent.ownerId,
+      guestUploadPolicy: newEvent.guestUploadPolicy,
+      createdAt: newEvent.createdAt,
+      themeImageUrl: newEvent.themeImageUrl,
+    });
   } catch (error) {
     console.log(error)
     return NextResponse.json({ error: "Failed to create event" }, { status: 500 });

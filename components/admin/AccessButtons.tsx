@@ -11,8 +11,9 @@ interface AccessButtonProps {
   guestLink: string;
 }
 
-export default function AccessButtons({ eventId, passcode, guestLink }: AccessButtonProps) {
+export default function AccessButtons({ eventId, passcode: initialPasscode, guestLink }: AccessButtonProps) {
   const [isRotating, setIsRotating] = useState(false);
+  const [passcode, setPasscode] = useState(initialPasscode);
   const [copiedPasscode, setCopiedPasscode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -25,6 +26,7 @@ export default function AccessButtons({ eventId, passcode, guestLink }: AccessBu
     const result = await rotateEventPasscode(eventId);
     
     if (result.success) {
+      setPasscode(result.newPasscode ?? initialPasscode);
       toast.success("Passcode Rotated", { id: toastId, description: "New access key is now active." });
     } else {
       toast.error("Rotation Failed", { id: toastId });
@@ -34,6 +36,7 @@ export default function AccessButtons({ eventId, passcode, guestLink }: AccessBu
   };
 
   const handleCopyPasscode = () => {
+    if (!passcode) return;
     navigator.clipboard.writeText(passcode);
     setCopiedPasscode(true);
     toast.success("Passcode copied to clipboard");
@@ -41,6 +44,7 @@ export default function AccessButtons({ eventId, passcode, guestLink }: AccessBu
   };
 
   const handleCopyLink = () => {
+    if (!passcode) return;
     // Copies a beautifully formatted string with both link and passcode
     const shareText = `Here is your Vault Access Link:\n${guestLink}\n\nPasscode: ${passcode}`;
     navigator.clipboard.writeText(shareText);
@@ -54,7 +58,7 @@ export default function AccessButtons({ eventId, passcode, guestLink }: AccessBu
       {/* Primary Action: Copy Full Link */}
       <button 
         onClick={handleCopyLink}
-        className="w-full bg-[#0e0e0f] text-white py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#c94a20] transition-all shadow-lg active:scale-95"
+        className="w-full bg-primary text-primary-foreground py-3.5 rounded-lg text-[12px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:brightness-110 transition-all shadow-lg active:scale-95"
       >
         {copiedLink ? <Check size={16} /> : <LinkIcon size={16} />}
         {copiedLink ? "Link Copied!" : "Copy Shareable Link"}
@@ -65,7 +69,7 @@ export default function AccessButtons({ eventId, passcode, guestLink }: AccessBu
         <button 
           onClick={handleRotate}
           disabled={isRotating}
-          className="flex-1 bg-white border border-[#dbd8cf] text-[#0e0e0f] py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#f5f4f0] hover:border-red-200 hover:text-red-600 transition-all disabled:opacity-50"
+          className="flex-1 bg-card border border-border text-foreground py-3 rounded-lg text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-subtle hover:border-red-200 hover:text-red-600 transition-all disabled:opacity-50"
         >
           <RefreshCw size={14} className={isRotating ? "animate-spin" : ""} />
           Rotate
@@ -74,7 +78,7 @@ export default function AccessButtons({ eventId, passcode, guestLink }: AccessBu
         {/* Secondary Action: Copy Passcode Only */}
         <button 
           onClick={handleCopyPasscode}
-          className="flex-1 bg-white border border-[#dbd8cf] text-[#0e0e0f] py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#f5f4f0] transition-all"
+          className="flex-1 bg-card border border-border text-foreground py-3 rounded-lg text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-subtle transition-all"
         >
           {copiedPasscode ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
           Passcode
