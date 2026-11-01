@@ -9,6 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.github
 
 # testing
 /coverage
@@ -20,10 +21,13 @@
 /.next-e2e*/
 /.next-final*/
 /.next-passcode/
+/.next-theme/
 /.next-login/
 /.next-login-server/
 /.next-login*/
 /out/
+/.next-ui-review*/
+/.next-ui-final/
 
 # production
 /build

@@ -16,6 +16,14 @@ Vault OS is an event photo platform where guests find **their own** photos witho
 
 Every photo goes through the same pipeline: **upload → S3 storage → Rekognition face indexing → person clustering → guest retrieval.**
 
+## Documentation
+
+Start at the [documentation index](docs/README.md). It links to the [architecture](docs/architecture.md), [API reference](docs/api.md), [security and privacy guide](docs/security-privacy.md), [development guide](docs/development.md), [testing guide](docs/testing.md), and [release checklist](docs/api-operations-checklist.md).
+
+### Screenshots
+
+See the [admin command center](docs/images/admin-command-center.png), [admin login](docs/images/admin-login.png), and [guest passcode gate](docs/images/guest-passcode-gate.png) captures. They show local UI with a disposable demo event, not production data. See [all captions](docs/README.md#screenshots).
+
 ---
 
 ## Tech stack
@@ -24,9 +32,9 @@ Every photo goes through the same pipeline: **upload → S3 storage → Rekognit
 | :--- | :--- | :--- |
 | Framework | Next.js 16 (App Router, Turbopack) | Server Components + Server Actions |
 | Auth (admin) | NextAuth (Credentials provider) | `ADMIN_USERNAME` / `ADMIN_PASSWORD` env-based login |
-| Auth (guest) | Passcode + signed cookie | Per-event, set in `lib/actions/guest-actions.ts` |
+| Auth (guest) | Passcode + signed cookie | Event-scoped cookie from the server action or passcode API |
 | Database | PostgreSQL + Prisma ORM | See [Data model](#data-model) |
-| Object storage | Amazon S3 | Raw assets; proxied through `/api/upload/view`, never exposed directly |
+| Object storage | Amazon S3 | Private objects; reads use authorized proxying or short-lived signed URLs |
 | Face intelligence | AWS Rekognition (Collections API) | One collection per event: `event-{eventId}` |
 | Liveness capture | AWS Amplify UI (`FaceLivenessDetector`) | Guest-facing "Find Me" flow, needs a Cognito Identity Pool |
 | Styling | Tailwind CSS v4 + Radix UI + Framer Motion | |
@@ -43,7 +51,7 @@ Event ──< Asset ──< FaceDetection ──> Person ──< FaceSample
 ```
 
 - **Event** — one per gig/wedding/party. Holds the passcode, upload policy, theme image, and privacy toggles (`biometricSearch`, `publicGallery`).
-- **Asset** — one row per uploaded photo/video. Tracks the AI pipeline via `status` (`pending → processing → processed | failed`) and guest-upload visibility via `moderationState` (`pending → approved`).
+- **Asset** — one row per uploaded photo/video. Route handlers use lowercase processing states (`uploading → processing → processed | failed`) and moderation states (`pending → approved`). The Prisma String defaults are uppercase `PENDING`; see the implementation caveat in [Architecture](docs/architecture.md#data-model).
 - **Person** — a *cluster* of faces Rekognition believes are the same individual, scoped to one event. Created the first time a face doesn't match anyone existing (`FaceMatchThreshold: 90`).
 - **FaceDetection** — one row per face Rekognition finds in an Asset. Stores the raw `faceId`, `confidence`, and `boundingBox`, and links to whichever `Person` it was clustered into.
 - **FaceSample** — reference face(s) used for a guest's live "Find Me" match.
@@ -86,7 +94,7 @@ prisma/schema.prisma
 ## Getting started
 
 ### Prerequisites
-- Node.js 20+
+- Node.js 20.9+
 - A PostgreSQL database (local or hosted)
 - An AWS account with **S3** and **Rekognition** access, plus a **Cognito Identity Pool** if you want the guest liveness capture to work
 
@@ -100,30 +108,13 @@ npm install
 
 ### 2. Configure environment
 
-Copy the block below into `.env`:
+Copy the environment template and fill in the required values:
 
-```bash
-# --- Database ---
-DATABASE_URL="postgresql://user:password@localhost:5432/vault"
-
-# --- Admin auth (NextAuth) ---
-NEXTAUTH_SECRET="generate-with: openssl rand -base64 32"
-NEXTAUTH_URL="http://localhost:3000"
-ADMIN_USERNAME="admin"
-ADMIN_PASSWORD="change-me"
-
-# --- AWS (server-side: S3 + Rekognition) ---
-AWS_REGION="us-east-1"
-AWS_ACCESS_KEY_ID="AKIA..."
-AWS_SECRET_ACCESS_KEY="..."
-AWS_S3_BUCKET="your-bucket-name"
-
-# --- AWS (client-side: guest liveness capture via Amplify) ---
-NEXT_PUBLIC_AWS_REGION="us-east-1"
-NEXT_PUBLIC_AWS_IDENTITY_POOL_ID="us-east-1:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+```powershell
+Copy-Item .env.template .env
 ```
 
-> The `NEXT_PUBLIC_*` vars are separate from the server-side AWS credentials on purpose — they're exposed to the browser and only grant the scoped, unauthenticated Cognito Identity Pool permissions needed for the liveness widget, not your actual IAM user.
+See [Environment variables](docs/development.md#environment-variables) for descriptions. Values in `.env.template` are blank placeholders. Never put server AWS keys in a `NEXT_PUBLIC_*` variable; those values are sent to the browser.
 
 ### 3. Set up the database
 
@@ -144,17 +135,10 @@ Visit `http://localhost:3000/login` for the admin console, or `http://localhost:
 
 ## AWS setup notes
 
-- **S3 bucket**: private, no public access. Everything is served through `/api/upload/view`, which fetches the object server-side and streams the bytes back — the bucket itself is never reachable from the browser.
-- **Rekognition collections**: created lazily, one per event (`event-{eventId}`), the first time an asset from that event is processed. You don't need to pre-create anything.
-- **Minimum IAM policy** for the server-side credentials:
-  ```
-  s3:GetObject, s3:PutObject           on your bucket
-  rekognition:CreateCollection
-  rekognition:DescribeCollection
-  rekognition:IndexFaces
-  rekognition:SearchFaces
-  ```
-- **Cognito Identity Pool**: needs unauthenticated access enabled, scoped to `rekognition:DetectFaces` / liveness session permissions only — this is the pool the browser talks to directly for the "Find Me" capture, so keep it minimal.
+- **S3 bucket**: keep it private and block public access. Uploads use short-lived presigned PUT URLs; reads use authorized server-side proxying and, in selected admin/list flows, short-lived signed GET URLs.
+- **Rekognition collections**: event creation attempts to create one collection named `event-{eventId}`. AWS setup can fail without rolling back event creation; check logs and service access before processing media.
+- **IAM**: server permissions cover required S3 object operations and Rekognition collection, indexing, search, deletion, and liveness operations. The exact policy depends on deployment; use least privilege and resource-scoped ARNs. See [Development and operations](docs/development.md#aws-prerequisites) and [Security and privacy](docs/security-privacy.md).
+- **Cognito Identity Pool**: the browser's unauthenticated identity is separate from server AWS credentials. Restrict its role to the liveness flow; do not grant it S3 access or server-side permissions.
 
 ---
 

@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 
 // 3. VIEWPORT EXPORT (Theme and scaling data goes here)
 export const viewport: Viewport = {
-  themeColor: "#faf8f4",
+  themeColor: "#f7f4ee",
   colorScheme: "light dark",
   width: "device-width",
   initialScale: 1,

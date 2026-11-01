@@ -35,8 +35,8 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts",
-    ".next-login-server/dev/types/**/*.ts",
-    ".next-login-server/types/**/*.ts"
+    ".next-ui-review2/types/**/*.ts",
+    ".next-ui-review2/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

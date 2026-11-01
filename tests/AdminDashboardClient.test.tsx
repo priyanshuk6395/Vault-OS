@@ -85,4 +85,17 @@ describe("AdminDashboardClient", () => {
     });
     expect(await screen.findByText("Evening Reception")).toBeInTheDocument();
   });
+
+  it("shows archive totals and filters vaults with an explicit empty state", async () => {
+    const user = userEvent.setup();
+    render(<AdminDashboardClient events={events} />);
+
+    expect(screen.getByText("1/1")).toBeInTheDocument();
+    expect(screen.getByText("Media assets")).toBeInTheDocument();
+    expect(screen.getByText("People indexed")).toBeInTheDocument();
+
+    await user.type(screen.getByRole("searchbox", { name: /search event vaults/i }), "missing");
+    expect(screen.getByRole("status")).toHaveTextContent("No matching vaults");
+    expect(screen.queryByRole("link", { name: /autumn reception/i })).not.toBeInTheDocument();
+  });
 });

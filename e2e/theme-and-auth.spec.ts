@@ -50,26 +50,26 @@ test("theme choices update the root class without moving the login layout", asyn
   await chooseTheme(page, "Light");
   await expect.poll(() => page.locator("html").evaluate((element) => element.classList.contains("light"))).toBe(true);
   expect(await themeTokens(page)).toEqual({
-    background: "#faf8f4",
+    background: "#f7f4ee",
     surface: "#ffffff",
-    foreground: "#20232b",
-    primary: "#4169e1",
-    secondary: "#e9e5ff",
-    teal: "#168c82",
-    coral: "#e97863",
+    foreground: "#18191b",
+    primary: "#c85a32",
+    secondary: "#eae3d6",
+    teal: "#6b7b67",
+    coral: "#c85a32",
   });
   expect(await mainBounds(main)).toEqual(initialBounds);
 
   await chooseTheme(page, "Dark");
   await expect.poll(() => page.locator("html").evaluate((element) => element.classList.contains("dark"))).toBe(true);
   expect(await themeTokens(page)).toEqual({
-    background: "#0b0c10",
-    surface: "#13151c",
-    foreground: "#f5f6f8",
-    primary: "#4169e1",
-    secondary: "#e9e5ff",
-    teal: "#168c82",
-    coral: "#e97863",
+    background: "#0d0e11",
+    surface: "#15161b",
+    foreground: "#f5f4f0",
+    primary: "#de6d45",
+    secondary: "#202229",
+    teal: "#84967f",
+    coral: "#de6d45",
   });
   expect(await mainBounds(main)).toEqual(initialBounds);
 
