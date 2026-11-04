@@ -13,7 +13,7 @@ export default function CreateEventModal({ isOpen, onClose }: { isOpen: boolean,
     setLoading(true);
     const res = await fetch("/api/admin/events/create", {
       method: "POST",
-      body: JSON.stringify({ name, passcode: passcode.toUpperCase() }),
+      body: JSON.stringify({ name, passcode }),
       headers: { "Content-Type": "application/json" }
     });
 
@@ -51,8 +51,12 @@ export default function CreateEventModal({ isOpen, onClose }: { isOpen: boolean,
             <label className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest">Guest Passcode</label>
             <input 
               value={passcode} 
-              onChange={(e) => setPasscode(e.target.value)}
-              placeholder="e.g. GOA-VIBES" 
+              onChange={(e) => setPasscode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              maxLength={6}
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              autoComplete="one-time-code"
+              placeholder="e.g. 482915" 
               className="w-full bg-background border border-input rounded-md px-4 py-3 text-foreground font-mono tracking-widest focus:border-primary outline-none transition-all" 
             />
           </div>
@@ -66,7 +70,7 @@ export default function CreateEventModal({ isOpen, onClose }: { isOpen: boolean,
 
           <button 
             onClick={handleCreate}
-            disabled={loading || !name || !passcode}
+            disabled={loading || !name.trim() || passcode.length !== 6}
             className="w-full bg-primary text-primary-foreground font-bold py-4 rounded-md mt-4 hover:brightness-110 transition-all disabled:opacity-50"
           >
             {loading ? "Initializing Vault..." : "Create Event Vault"}

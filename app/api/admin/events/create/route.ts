@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { initializeEventCollection } from "@/lib/rekognition";
-import { encryptEventPasscode } from "@/lib/passcode";
+import { encryptEventPasscode, isValidEventPasscode } from "@/lib/passcode";
 
 export async function POST(req: Request) {
   try {
@@ -12,8 +12,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { name, passcode } = await req.json();
-    if (typeof name !== "string" || !name.trim() || typeof passcode !== "string" || passcode.trim().length < 4) {
-      return NextResponse.json({ error: "A title and passcode of at least 4 characters are required." }, { status: 400 });
+    if (typeof name !== "string" || !name.trim() || !isValidEventPasscode(passcode)) {
+      return NextResponse.json({ error: "A title and a six-digit numeric passcode are required." }, { status: 400 });
     }
     const ownerId = session.user.id;
 

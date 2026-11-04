@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { issueGuestSessionCookie } from "@/lib/guest-session";
-import { migrateLegacyPasscodeIfCurrent, verifyEventPasscode } from "@/lib/passcode";
+import { isValidEventPasscode, migrateLegacyPasscodeIfCurrent, verifyEventPasscode } from "@/lib/passcode";
 import { finishPasscodeAttempt, getClientIp, reservePasscodeAttempt } from "@/lib/passcode-attempts";
 
 export async function POST(req: Request, { params }: { params: Promise<{ eventId: string }> }) {
@@ -12,8 +12,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
     where: { id: eventId }
   });
 
-  if (typeof passcode !== "string") {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 400 });
+  if (!isValidEventPasscode(passcode)) {
+    return NextResponse.json({ error: "Passcode must be exactly 6 digits." }, { status: 400 });
   }
   if (!event) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   const clientIp = getClientIp(req.headers);

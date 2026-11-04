@@ -1,7 +1,8 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 
 const KEY_LENGTH = 64;
+const EVENT_PASSCODE_PATTERN = /^\d{6}$/;
 
 function deriveKey(passcode: string, salt: string) {
   return new Promise<Buffer>((resolve, reject) => {
@@ -14,6 +15,10 @@ function deriveKey(passcode: string, salt: string) {
 
 export function normalizePasscode(passcode: string) {
   return passcode.trim().toUpperCase();
+}
+
+export function isValidEventPasscode(passcode: unknown): passcode is string {
+  return typeof passcode === "string" && EVENT_PASSCODE_PATTERN.test(normalizePasscode(passcode));
 }
 
 export function isEventPasscodeHash(passcode: string) {
@@ -31,10 +36,14 @@ function getPasscodeEncryptionKey() {
 }
 
 export function encryptEventPasscode(passcode: string) {
+  const normalizedPasscode = normalizePasscode(passcode);
+  if (!EVENT_PASSCODE_PATTERN.test(normalizedPasscode)) {
+    throw new Error("Event passcodes must be exactly 6 digits");
+  }
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", getPasscodeEncryptionKey(), iv);
   const ciphertext = Buffer.concat([
-    cipher.update(normalizePasscode(passcode), "utf8"),
+    cipher.update(normalizedPasscode, "utf8"),
     cipher.final(),
   ]);
   return [
@@ -70,13 +79,18 @@ function passcodesMatch(left: string, right: string) {
 }
 
 export async function hashEventPasscode(passcode: string) {
+  const normalizedPasscode = normalizePasscode(passcode);
+  if (!EVENT_PASSCODE_PATTERN.test(normalizedPasscode)) {
+    throw new Error("Event passcodes must be exactly 6 digits");
+  }
   const salt = randomBytes(16).toString("base64url");
-  const key = await deriveKey(normalizePasscode(passcode), salt);
+  const key = await deriveKey(normalizedPasscode, salt);
   return `scrypt$v1$${salt}$${key.toString("base64url")}`;
 }
 
 export async function verifyEventPasscode(passcode: string, storedPasscode: string) {
   const normalized = normalizePasscode(passcode);
+  if (!EVENT_PASSCODE_PATTERN.test(normalized)) return false;
   if (isEncryptedEventPasscode(storedPasscode)) {
     const decrypted = decryptEventPasscode(storedPasscode);
     return decrypted !== null && passcodesMatch(normalized, decrypted);
@@ -96,7 +110,7 @@ export async function verifyEventPasscode(passcode: string, storedPasscode: stri
 }
 
 export function generateEventPasscode() {
-  return randomBytes(12).toString("base64url").slice(0, 16).toUpperCase();
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
 }
 
 export async function migrateLegacyPasscodeIfCurrent(eventId: string, passcode: string, storedPasscode: string) {
@@ -128,11 +142,11 @@ export async function getDisplayableEventPasscode(eventId: string) {
 
     if (isEncryptedEventPasscode(event.passcode)) {
       const passcode = decryptEventPasscode(event.passcode);
-      if (passcode !== null) return { passcode, rotated: false };
+      if (passcode !== null && isValidEventPasscode(passcode)) return { passcode, rotated: false };
     }
 
-    const rotated = isEventPasscodeHash(event.passcode) || isEncryptedEventPasscode(event.passcode);
-    const visiblePasscode = rotated ? generateEventPasscode() : event.passcode;
+    const rotated = !isValidEventPasscode(event.passcode);
+    const visiblePasscode = rotated ? generateEventPasscode() : normalizePasscode(event.passcode);
     const encryptedPasscode = encryptEventPasscode(visiblePasscode);
     const result = await prisma.event.updateMany({
       where: { id: eventId, passcode: event.passcode },

@@ -13,7 +13,7 @@ export async function rotateEventPasscode(eventId: string) {
   const { event, isOwner } = await getEventAuthorization(eventId);
   if (!event || !isOwner) throw new Error("Unauthorized");
 
-  // Generate a new 8-character uppercase passcode
+  // Generate a new six-digit numeric passcode
   const newPasscode = generateEventPasscode();
 
   try {

@@ -14,9 +14,9 @@ export default function FirstEventPage() {
   const router = useRouter();
 
   const handleCreate = async () => {
-    if (!name || !passcode) {
+    if (!name.trim() || passcode.length !== 6) {
       toast.error("Initialization Failed", {
-        description: "Please provide both an instance title and a passcode.",
+        description: "Provide an instance title and a six-digit passcode.",
       });
       return;
     }
@@ -30,7 +30,7 @@ export default function FirstEventPage() {
     try {
       const res = await fetch("/api/admin/events/create", {
         method: "POST",
-        body: JSON.stringify({ name, passcode: passcode.toUpperCase() }),
+        body: JSON.stringify({ name, passcode }),
         headers: { "Content-Type": "application/json" }
       });
 
@@ -49,11 +49,11 @@ export default function FirstEventPage() {
         const errorData = await res.json();
         throw new Error(errorData.message || "Failed to deploy assets.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setIsInitializing(false);
       toast.error("Deployment Error", {
         id: toastId,
-        description: error.message,
+        description: error instanceof Error ? error.message : "Failed to create event.",
       });
     }
   };
@@ -116,10 +116,14 @@ export default function FirstEventPage() {
               <div className="relative group">
                 <input 
                   type="text"
-                  maxLength={12}
-                  placeholder="MIN_8_CHARS" 
+                  maxLength={6}
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  autoComplete="one-time-code"
+                  placeholder="000000" 
                   className="w-full bg-background border border-input p-4 sm:p-5 rounded-lg text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-all font-mono text-xs sm:text-sm uppercase tracking-widest"
-                  onChange={(e) => setPasscode(e.target.value)}
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 />
                 <ShieldAlert size={18} className="absolute right-4 sm:right-5 top-4 sm:top-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
               </div>
@@ -128,7 +132,7 @@ export default function FirstEventPage() {
             <div className="pt-2 sm:pt-4">
               <button 
                 onClick={handleCreate}
-                disabled={!name || passcode.length < 4 || isInitializing}
+                disabled={!name.trim() || passcode.length !== 6 || isInitializing}
                 className={cn(
                   "w-full py-4 sm:py-5 rounded-2xl font-bold uppercase tracking-[0.2em] text-[11px] sm:text-[12px] transition-all duration-500 flex items-center justify-center gap-3",
                   isInitializing 

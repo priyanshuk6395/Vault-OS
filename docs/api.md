@@ -6,7 +6,7 @@ This reference covers the Next.js App Router handlers under `app/api`. Dynamic v
 
 - Admin routes require a NextAuth session and, for event data, event ownership.
 - Guest routes require a valid event session cookie. Some media operations also require a verified person cookie.
-- Passcode endpoints are public entry points protected by an event/IP attempt limiter.
+- Event passcodes are exactly six decimal digits. Passcode endpoints reject other formats before reserving an attempt and apply both a per-IP and an event-wide failed-attempt limit.
 - S3 and Rekognition operations are initiated server-side, except the browser liveness capture performed through Amplify/Cognito.
 - Most responses are JSON. Archive endpoints stream `application/zip`; `/api/upload/view` returns image bytes.
 - Private media/list responses set `Cache-Control` to `private, no-store` (or equivalent). Do not put these responses behind a shared public cache.
@@ -16,14 +16,14 @@ This reference covers the Next.js App Router handlers under `app/api`. Dynamic v
 | Method and path | Access | Behavior |
 | --- | --- | --- |
 | `GET`, `POST /api/auth/[...nextauth]` | NextAuth | Credentials sign-in, callback, session, and sign-out handlers. |
-| `POST /api/events` | Admin session | Additional event-create endpoint accepting `{ title, passcode, guestUploadPolicy? }`; encrypts the passcode and attempts Rekognition collection setup. Returns `201` with event fields. |
-| `POST /api/admin/events/create` | Admin session | Event-create endpoint used by the current admin create page and modal. Accepts `{ name, passcode }`, initializes the event collection, and returns event fields. |
+| `POST /api/events` | Admin session | Additional event-create endpoint accepting `{ title, passcode, guestUploadPolicy? }` with a six-digit passcode; encrypts the passcode and attempts Rekognition collection setup. Returns `201` with event fields. |
+| `POST /api/admin/events/create` | Admin session | Event-create endpoint used by the current admin create page and modal. Accepts `{ name, passcode }` with a six-digit passcode, initializes the event collection, and returns event fields. |
 | `GET /api/admin/events` | Admin session | Lists events owned by the session user (including the legacy owner mapping); `Cache-Control: no-store`. |
 | `POST /api/admin/log-telemetry` | Admin session + event owner | Writes an `ADMIN_ACCESS` audit entry for the event. Uses the first forwarded IP value when present. |
 | `POST /api/admin/moderate-upload` | Event owner | Body `{ assetId, action }` where action is `approve` or `reject`; approval migrates the object from pending to approved storage, while rejection removes the object and face vectors. |
 | `GET /api/admin/sidebar-stats?eventId={id}` | Event owner | Returns asset, person, and face-review counts. Missing `eventId` is `400`. |
-| `POST /api/events/verify-passcode` | Public, rate-limited | Body `{ eventId, passcode }`; verifies the event passcode, records audit data, and issues a guest cookie. Success returns `{ success: true, eventId }`. |
-| `POST /api/events/{eventId}/verify` | Public, rate-limited | Body `{ passcode }`; verifies a passcode for the path event and issues a guest cookie. |
+| `POST /api/events/verify-passcode` | Public, rate-limited | Body `{ eventId, passcode }`; requires six digits, verifies the event passcode, records audit data, and issues a guest cookie. Success returns `{ success: true, eventId }`. |
+| `POST /api/events/{eventId}/verify` | Public, rate-limited | Body `{ passcode }`; requires six digits, verifies a passcode for the path event, and issues a guest cookie. |
 | `PATCH /api/events/{eventId}/settings` | Event owner | Updates `title` and/or `themeImageUrl`. A selected theme asset must be approved and belong to that event. |
 | `GET /api/events/{eventId}/stats` | Event owner | Returns event title, total/image/video asset counts, and unnamed-person count. |
 | `GET /api/events/{eventId}/assets` | Event owner or eligible guest | Lists event assets. Guest access requires `publicGallery`; guest results are restricted to approved, processed assets. Adds authorized signed URLs and uploader labels. |
@@ -49,9 +49,9 @@ This reference covers the Next.js App Router handlers under `app/api`. Dynamic v
 | `PATCH /api/people/{personId}` | Event owner for the person's event | Body `{ name, status? }`; trims the name and merges into an existing same-event name match when found. |
 | `POST /api/upload/init` | Event owner or eligible guest | Creates upload records and returns signed S3 PUT URLs. Accepts one file or `{ eventId, uploaderId?, files: [...] }`; batch limit 1–100, 50 MiB per file, matching image/video MIME prefixes. Signed URLs expire after 300 seconds. |
 | `POST /api/upload/complete` | Event owner or verified uploader guest | Body `{ assetId, uploaderId? }`; claims and processes an upload, indexes faces for images, and persists matches. Existing processing returns `202`; completed work is idempotent. |
-| `POST /api/upload/fail` | Event owner or verified uploader guest | Body `{ assetId, uploaderId? }`; marks eligible uploading, uploaded, or stale-processing assets failed. |
+| `POST /api/upload/fail` | Event owner or verified uploader guest | Body `{ assetId, uploaderId?, failureStage?, errorMessage? }`; marks eligible uploading, uploaded, or stale-processing assets failed and stores a sanitized client failure detail. Backend processing errors already recorded by `/api/upload/complete` are not overwritten. |
 | `GET /api/upload/download-url?key={key}&filename={name?}` | Event owner or eligible guest | Signs a short-lived download URL after checking asset visibility. The optional filename has quotes and newlines replaced. URL expires after 60 seconds. |
-| `GET /api/upload/view?key={key}&w={width?}&q={quality?}&format={format?}` | Event owner or eligible guest | Returns image bytes from private S3 after access checks. Width is 1–4096; quality is 1–100; formats are WebP, JPEG, PNG, and AVIF. Videos return `415`. |
+| `GET /api/upload/view?key={key}&w={width?}&q={quality?}&format={format?}` | Event owner or eligible guest | Returns image bytes from private S3 after access checks. Width is 1–4096; quality is 1–100; formats are WebP, JPEG, PNG, and AVIF. Videos return `415`; unexpected S3 or image-processing failures return `502`. |
 
 ## Common errors
 
@@ -67,5 +67,6 @@ Handlers use endpoint-specific messages. Common status meanings are:
 | `413` | Upload exceeds the 50 MiB per-file limit |
 | `429` | Passcode attempt limit reached |
 | `500` | Database, storage, signing, or processing failure |
+| `502` | An upstream media source or image transformation failed |
 
 For exact request validation and side-effect assertions, see [`tests/api-routes.test.ts`](../tests/api-routes.test.ts). It invokes route handlers directly with mocked Prisma, auth, S3, presigner, and Rekognition dependencies; it is not a live-service integration test.

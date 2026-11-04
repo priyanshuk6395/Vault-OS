@@ -14,6 +14,8 @@ export async function GET(req: Request) {
 
   if (!key) return new NextResponse("Not Found", { status: 404 });
 
+  let mediaAssetId: string | undefined;
+  let mediaEventId: string | undefined;
   try {
     const asset = await prisma.asset.findFirst({
       where: { storageKey: key },
@@ -27,6 +29,8 @@ export async function GET(req: Request) {
         event: { select: { ownerId: true } },
       },
     });
+    mediaAssetId = asset?.id;
+    mediaEventId = asset?.eventId;
     const session = await getServerSession(authOptions);
     let eventId = asset?.eventId;
     let isOwner = !!asset && ownsEvent(asset.event.ownerId, session?.user?.id);
@@ -106,7 +110,13 @@ export async function GET(req: Request) {
         "Vary": "Cookie",
       },
     });
-  } catch {
-    return new NextResponse("Access Denied", { status: 403 });
+  } catch (error) {
+    console.error("[UPLOAD_VIEW_ERROR]:", {
+      eventId: mediaEventId,
+      assetId: mediaAssetId,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return new NextResponse("Media source unavailable", { status: 502 });
   }
 }

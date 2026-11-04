@@ -144,6 +144,11 @@ describe("UploadProvider", () => {
         body: expect.stringContaining('"assetId":"asset-1"'),
       })
     );
+    const failureCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith("/api/upload/fail"));
+    expect(JSON.parse(String(failureCall?.[1]?.body))).toMatchObject({
+      failureStage: "s3-put",
+      errorMessage: "Storage upload failed (503)",
+    });
     const attemptsBeforeRetry = xhrAttempts;
     expect(attemptsBeforeRetry).toBeGreaterThan(0);
 

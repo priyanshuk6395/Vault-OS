@@ -77,6 +77,8 @@ Upload initialization accepts a single file or a batch of up to 100. Each file m
 
 For WebP, the completion handler downloads the object and converts it to JPEG bytes before calling Rekognition. Other image types are passed by S3 object reference.
 
+Face matching limits concurrent `SearchFaces` calls to two per Node.js process and retries AWS throughput/throttling exceptions up to three times with exponential backoff and jitter. This reduces bursts but is process-local; multi-instance deployments should monitor Rekognition quotas and consider a durable queue or quota increase for sustained upload volume.
+
 ### Guest access and face search
 
 1. A guest submits an event passcode through a page action or verification route.
@@ -86,7 +88,7 @@ For WebP, the completion handler downloads the object and converts it to JPEG by
 
 ### Media reads and downloads
 
-The browser does not receive a public S3 object URL for gallery media. `/api/upload/view` authorizes the caller, fetches the private object server-side, applies optional image transformations, and returns private, non-cacheable bytes. Download URL requests are also authorized before a short-lived URL is signed. ZIP endpoints stream S3 object bodies through `archiver` rather than buffering the whole archive to disk.
+The browser does not receive a public S3 object URL for gallery media. `/api/upload/view` authorizes the caller, fetches the private object server-side, applies optional image transformations, and returns private, non-cacheable bytes. Explicit authorization failures return `403`; unexpected S3/image-processing failures are logged and return `502` instead of being mislabeled as access denials. Download URL requests are also authorized before a short-lived URL is signed. ZIP endpoints stream S3 object bodies through `archiver` rather than buffering the whole archive to disk.
 
 ## Trust boundaries
 

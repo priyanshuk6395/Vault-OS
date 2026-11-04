@@ -59,20 +59,24 @@ export default function PasscodeGate({ eventId, eventTitle, onVerified }: Passco
           <input
             type="text"
             aria-label="Guest passcode"
-            placeholder="ENTER_PASSCODE"
+            placeholder="000000"
             value={passcode}
-            onChange={(e) => setPasscode(e.target.value.toUpperCase())}
-            onKeyDown={(e) => e.key === 'Enter' && passcode.length >= 4 && handleVerify()}
+            onChange={(e) => setPasscode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            maxLength={6}
+            inputMode="numeric"
+            pattern="[0-9]{6}"
+            autoComplete="one-time-code"
+            onKeyDown={(e) => e.key === 'Enter' && passcode.length === 6 && handleVerify()}
             className="w-full bg-background border border-input px-6 py-4 rounded-lg text-center font-mono text-lg tracking-[0.4em] text-foreground focus:border-primary outline-none transition-all placeholder:text-muted-foreground placeholder:tracking-[0.2em]"
           />
         </div>
         
         <button
           onClick={handleVerify}
-          disabled={loading || passcode.length < 4}
+          disabled={loading || passcode.length !== 6}
           className={cn(
             "w-full py-4 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-3",
-            loading || passcode.length < 4
+            loading || passcode.length !== 6
               ? "bg-subtle text-muted-foreground cursor-not-allowed"
               : "bg-primary text-primary-foreground hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-primary/20"
           )}

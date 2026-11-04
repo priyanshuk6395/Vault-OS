@@ -12,7 +12,7 @@ Vitest runs in jsdom. The current suite has unit tests for auth helpers, passcod
 
 Route tests invoke the exported handler directly. Prisma, NextAuth/session helpers, the AWS clients, presigner, and Rekognition helper are mocked; image fixtures and archive streams are generated locally. This gives deterministic contract coverage without AWS charges, cloud writes, or database mutations. It does **not** validate deployed IAM, S3 CORS, Cognito permissions, network behavior, database migrations, or actual Rekognition model results.
 
-Run only the route suite with:
+The focused route suite currently contains 48 cases. Run only the route suite with:
 
 ```powershell
 npm test -- --reporter=dot tests/api-routes.test.ts

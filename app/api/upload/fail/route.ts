@@ -3,10 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { getEventAuthorization, getGuestPersonId } from "@/lib/guest-session";
 
 const PROCESSING_STALE_AFTER_MS = 5 * 60 * 1000;
+const FAILURE_STAGES = ["preparing", "initializing", "s3-put", "finalizing"] as const;
 
 export async function POST(req: Request) {
   try {
-    const { assetId, uploaderId } = await req.json();
+    const { assetId, uploaderId, failureStage, errorMessage } = await req.json();
     if (typeof assetId !== "string" || !assetId) {
       return NextResponse.json({ error: "assetId is required" }, { status: 400 });
     }
@@ -25,6 +26,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Upload is not authorized for this guest." }, { status: 403 });
     }
 
+    const stage = FAILURE_STAGES.includes(failureStage) ? failureStage : "unknown";
+    const safeDetail = typeof errorMessage === "string"
+      ? errorMessage
+          .replace(/https?:\/\/\S+/gi, "[url]")
+          .replace(/[\u0000-\u001f\u007f]/g, " ")
+          .trim()
+          .slice(0, 240)
+      : "";
+    const failureDescription = safeDetail || "Client upload or processing failed.";
+
     await prisma.asset.updateMany({
       where: {
         id: assetId,
@@ -33,7 +44,7 @@ export async function POST(req: Request) {
           { status: "processing", jobStartedAt: { lt: new Date(Date.now() - PROCESSING_STALE_AFTER_MS) } },
         ],
       },
-      data: { status: "failed", errorMessage: "Client upload or processing failed." },
+      data: { status: "failed", errorMessage: `CLIENT_FAILURE[${stage}]: ${failureDescription}` },
     });
     return NextResponse.json({ success: true });
   } catch (error) {

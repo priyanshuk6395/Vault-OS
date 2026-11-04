@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
@@ -9,6 +9,7 @@ import {
   CreateCollectionCommand,
   DescribeCollectionCommand,
   type FaceRecord,
+  type SearchFacesCommandInput,
 } from '@aws-sdk/client-rekognition';
 import { rekognitionClient } from '@/lib/aws';
 import { s3Client } from '@/lib/aws';
@@ -17,10 +18,32 @@ import { getEventAuthorization, getGuestPersonId } from '@/lib/guest-session';
 import pLimit from 'p-limit';
 import sharp from 'sharp';
 
-const limitFaceMatching = pLimit(5);
+const limitFaceMatching = pLimit(2);
+const MAX_FACE_SEARCH_RETRIES = 3;
 
 function hasErrorName(error: unknown, name: string) {
   return error instanceof Error && error.name === name;
+}
+
+function isRekognitionThrottle(error: unknown) {
+  return error instanceof Error && [
+    'ProvisionedThroughputExceededException',
+    'ThrottlingException',
+    'TooManyRequestsException',
+  ].includes(error.name);
+}
+
+async function searchFacesWithBackoff(input: SearchFacesCommandInput) {
+  for (let retry = 0; ; retry += 1) {
+    try {
+      return await rekognitionClient.send(new SearchFacesCommand(input));
+    } catch (error) {
+      if (!isRekognitionThrottle(error) || retry >= MAX_FACE_SEARCH_RETRIES) throw error;
+      const delayMs = 400 * 2 ** retry + randomInt(0, 250);
+      console.warn(`[REKOGNITION_THROTTLED] SearchFaces retry ${retry + 1}/${MAX_FACE_SEARCH_RETRIES} after ${delayMs}ms`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
 }
 
 async function isCurrentProcessingAttempt(assetId: string, startedAt: Date, attemptId: string) {
@@ -68,6 +91,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Guest uploads are disabled for this event.' }, { status: 403 });
     }
     currentAssetId = assetId;
+
+    if (process.env.MEDIA_PROCESSING_MODE === "lambda") {
+      if (asset.status === 'processed') {
+        const detected = await prisma.faceDetection.count({ where: { assetId } });
+        return NextResponse.json({ success: true, detected, moderated: asset.moderationState === 'pending' });
+      }
+      if (asset.status === 'failed') {
+        return NextResponse.json({ error: 'Asset processing failed. Retry the upload.' }, { status: 409 });
+      }
+      if (!['uploading', 'uploaded', 'processing'].includes(asset.status)) {
+        return NextResponse.json({ error: 'Asset is not ready for processing.' }, { status: 409 });
+      }
+      if (asset.status === 'uploading') {
+        await prisma.asset.updateMany({
+          where: { id: assetId, status: 'uploading' },
+          data: { status: 'uploaded' },
+        });
+      }
+      return NextResponse.json({ success: true, processing: true }, { status: 202 });
+    }
 
     if (asset.status === 'processed') {
       const detected = await prisma.faceDetection.count({ where: { assetId } });
@@ -186,12 +229,12 @@ export async function POST(req: Request) {
       const faceId = record.Face?.FaceId;
       if (!faceId) return { record, faceId: null, matchIds: [] as string[], existingPersonId: null as string | null };
 
-      const searchResponse = await rekognitionClient.send(new SearchFacesCommand({
+      const searchResponse = await searchFacesWithBackoff({
         CollectionId: collectionId,
         FaceId: faceId,
         FaceMatchThreshold: 90,
         MaxFaces: 5,
-      }));
+      });
 
       const matches = searchResponse.FaceMatches?.filter(m => m.Face?.FaceId !== faceId) || [];
       const matchIds = matches.map(m => m.Face?.FaceId).filter(Boolean) as string[];

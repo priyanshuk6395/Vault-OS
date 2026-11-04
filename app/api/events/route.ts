@@ -4,7 +4,7 @@ import { initializeEventCollection } from '@/lib/rekognition';
 import { v4 as uuidv4 } from 'uuid';
 import { getServerSession } from 'next-auth';
 import { authOptions } from "@/lib/auth";
-import { encryptEventPasscode } from "@/lib/passcode";
+import { encryptEventPasscode, isValidEventPasscode } from "@/lib/passcode";
 
 export async function POST(req: Request) {
   try {
@@ -15,11 +15,8 @@ export async function POST(req: Request) {
     }
     const { title, passcode, guestUploadPolicy } = await req.json();
 
-    if (!title || !passcode) {
-      return NextResponse.json({ error: 'Title and passcode are required' }, { status: 400 });
-    }
-    if (typeof title !== "string" || typeof passcode !== "string" || passcode.trim().length < 4) {
-      return NextResponse.json({ error: 'Title and a passcode of at least 4 characters are required.' }, { status: 400 });
+    if (typeof title !== "string" || !title.trim() || !isValidEventPasscode(passcode)) {
+      return NextResponse.json({ error: "A title and a six-digit numeric passcode are required." }, { status: 400 });
     }
 
     // 1. Create the Event in PostgreSQL

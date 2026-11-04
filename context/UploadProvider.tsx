@@ -16,6 +16,8 @@ interface UploadTask {
   file?: File;
 }
 
+type UploadFailureStage = "preparing" | "initializing" | "s3-put" | "finalizing";
+
 interface UploadContextType {
   queue: UploadTask[];
   addFilesToQueue: (files: File[], eventId: string, uploaderId?: string) => string[];
@@ -52,7 +54,11 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
     syncUI();
   };
 
-  const executeUploadPipeline = async (task: UploadTask, onAssetInitialized: (assetId: string) => void) => {
+  const executeUploadPipeline = async (
+    task: UploadTask,
+    onAssetInitialized: (assetId: string) => void,
+    onStageChange: (stage: UploadFailureStage) => void,
+  ) => {
     const originalFile = task.file;
     if (!originalFile) throw new Error("Upload task has no file");
 
@@ -84,6 +90,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
       });
     }
 
+    onStageChange("initializing");
     updateTask(task.id, { statusMessage: "Requesting upload URL...", status: "uploading" });
     const initialized = await withRetry(async () => {
       const response = await fetch("/api/upload/init", {
@@ -99,7 +106,11 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
           clientUploadId: task.id,
         }),
       });
-      if (!response.ok) throw new Error(`Upload initialization failed (${response.status})`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => null) as { error?: unknown } | null;
+        const detail = typeof data?.error === "string" ? `: ${data.error}` : "";
+        throw new Error(`Upload initialization failed (${response.status})${detail}`);
+      }
       const data = await response.json();
       if (!data.uploadUrl || !data.assetId) throw new Error("Upload initialization response was incomplete");
       onAssetInitialized(data.assetId);
@@ -107,6 +118,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
       return data as { uploadUrl: string; assetId: string };
     });
 
+    onStageChange("s3-put");
     updateTask(task.id, { statusMessage: "Uploading..." });
     await withRetry(() => new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -125,6 +137,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
       xhr.send(fileToUpload);
     }));
 
+    onStageChange("finalizing");
     for (let attempt = 0; attempt < 300; attempt += 1) {
       updateTask(task.id, {
         statusMessage: attempt === 0 ? "Starting AI indexing..." : "AI indexing in progress...",
@@ -135,7 +148,11 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ assetId: initialized.assetId, uploaderId: task.uploaderId }),
         });
-        if (!response.ok) throw new Error(`Upload finalization failed (${response.status})`);
+        if (!response.ok) {
+          const data = await response.json().catch(() => null) as { error?: unknown } | null;
+          const detail = typeof data?.error === "string" ? `: ${data.error}` : "";
+          throw new Error(`Upload finalization failed (${response.status})${detail}`);
+        }
         return response.status === 202;
       });
       if (!stillProcessing) return;
@@ -147,17 +164,23 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
   const processTask = async (task: UploadTask) => {
     updateTask(task.id, { status: "processing", statusMessage: "Preparing image..." });
     let assetId: string | undefined;
+    let failureStage: UploadFailureStage = "preparing";
     try {
-      await executeUploadPipeline(task, (initializedAssetId) => { assetId = initializedAssetId; });
+      await executeUploadPipeline(
+        task,
+        (initializedAssetId) => { assetId = initializedAssetId; },
+        (stage) => { failureStage = stage; },
+      );
       updateTask(task.id, { status: "complete", progress: 100, statusMessage: "Secured" });
     } catch (error) {
       console.error(`[UPLOAD_FAILED] ${task.fileName}:`, error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown upload error";
       if (assetId) {
         try {
           const response = await fetch("/api/upload/fail", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ assetId, uploaderId: task.uploaderId }),
+            body: JSON.stringify({ assetId, uploaderId: task.uploaderId, failureStage, errorMessage }),
           });
           if (!response.ok) console.error(`[UPLOAD_FAILURE_REPORT_FAILED] ${task.fileName}: ${response.status}`);
         } catch (reportError) {

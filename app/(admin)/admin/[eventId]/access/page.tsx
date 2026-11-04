@@ -78,7 +78,7 @@ export default async function AccessControlPage({
             </div>
             {passcodeState.rotated && (
               <p role="status" className="mb-4 text-xs text-accent-amber">
-                A new passcode was generated because the previous stored code was not recoverable.
+                A new six-digit passcode was generated because the previous code did not meet the current policy or could not be recovered.
               </p>
             )}
           </div>

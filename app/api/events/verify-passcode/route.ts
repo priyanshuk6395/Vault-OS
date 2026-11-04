@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { issueGuestSessionCookie } from "@/lib/guest-session";
-import { migrateLegacyPasscodeIfCurrent, verifyEventPasscode } from "@/lib/passcode";
+import { isValidEventPasscode, migrateLegacyPasscodeIfCurrent, verifyEventPasscode } from "@/lib/passcode";
 import { finishPasscodeAttempt, getClientIp, reservePasscodeAttempt } from "@/lib/passcode-attempts";
 
 export async function POST(req: Request) {
   try {
     const { passcode, eventId } = await req.json();
-    if (typeof passcode !== "string" || typeof eventId !== "string" || !eventId) {
+    if (!isValidEventPasscode(passcode) || typeof eventId !== "string" || !eventId) {
       return NextResponse.json({ error: "Invalid passcode request." }, { status: 400 });
     }
 

@@ -127,6 +127,14 @@ test("guest event renders its passcode gate when an event is configured", async 
   await page.goto(`/guest/event/${eventId}`);
 
   await expect(page.getByText(/awaiting protocol passcode/i)).toBeVisible();
-  await expect(page.getByPlaceholder(/enter_passcode/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /unlock vault/i })).toBeDisabled();
+  const passcodeInput = page.getByRole("textbox", { name: /guest passcode/i });
+  await expect(passcodeInput).toBeVisible();
+  await expect(passcodeInput).toHaveAttribute("maxlength", "6");
+  await expect(passcodeInput).toHaveAttribute("inputmode", "numeric");
+  const unlockButton = page.getByRole("button", { name: /unlock vault/i });
+  await expect(unlockButton).toBeDisabled();
+  await passcodeInput.fill("12345");
+  await expect(unlockButton).toBeDisabled();
+  await passcodeInput.fill("123456");
+  await expect(unlockButton).toBeEnabled();
 });

@@ -62,6 +62,7 @@ const mocks = vi.hoisted(() => ({
   guestCanAccessAsset: vi.fn(),
   issueGuestSessionCookie: vi.fn(),
   verifyEventPasscode: vi.fn(),
+  isValidEventPasscode: (passcode: unknown) => typeof passcode === "string" && /^\d{6}$/.test(passcode.trim()),
   migrateLegacyPasscodeIfCurrent: vi.fn(),
   reservePasscodeAttempt: vi.fn(),
   finishPasscodeAttempt: vi.fn(),
@@ -87,6 +88,7 @@ vi.mock("@/lib/guest-session", () => ({
   issueGuestSessionCookie: mocks.issueGuestSessionCookie,
 }));
 vi.mock("@/lib/passcode", () => ({
+  isValidEventPasscode: mocks.isValidEventPasscode,
   verifyEventPasscode: mocks.verifyEventPasscode,
   migrateLegacyPasscodeIfCurrent: mocks.migrateLegacyPasscodeIfCurrent,
   encryptEventPasscode: mocks.encryptEventPasscode,
@@ -180,10 +182,12 @@ describe("API route boundaries", () => {
 
   describe("POST /api/events/verify-passcode", () => {
     it("rejects malformed input before reserving an attempt", async () => {
-      const response = await verifyPasscode(request("http://localhost/api/events/verify-passcode", { eventId: "event-1", passcode: 123 }));
+      const wrongType = await verifyPasscode(request("http://localhost/api/events/verify-passcode", { eventId: "event-1", passcode: 123 }));
+      const wrongFormat = await verifyPasscode(request("http://localhost/api/events/verify-passcode", { eventId: "event-1", passcode: "12A456" }));
 
-      expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ error: "Invalid passcode request." });
+      expect(wrongType.status).toBe(400);
+      expect(await wrongType.json()).toEqual({ error: "Invalid passcode request." });
+      expect(wrongFormat.status).toBe(400);
       expect(mocks.reservePasscodeAttempt).not.toHaveBeenCalled();
       expect(mocks.issueGuestSessionCookie).not.toHaveBeenCalled();
     });
@@ -191,7 +195,7 @@ describe("API route boundaries", () => {
     it("rate limits before checking the submitted passcode", async () => {
       mocks.reservePasscodeAttempt.mockResolvedValue(null);
 
-      const response = await verifyPasscode(request("http://localhost/api/events/verify-passcode", { eventId: "event-1", passcode: "wrong" }));
+      const response = await verifyPasscode(request("http://localhost/api/events/verify-passcode", { eventId: "event-1", passcode: "123456" }));
 
       expect(response.status).toBe(429);
       expect(mocks.verifyEventPasscode).not.toHaveBeenCalled();
@@ -201,7 +205,7 @@ describe("API route boundaries", () => {
     it("records a failed attempt and does not issue a guest cookie", async () => {
       mocks.verifyEventPasscode.mockResolvedValue(false);
 
-      const response = await verifyPasscode(request("http://localhost/api/events/verify-passcode", { eventId: "event-1", passcode: "wrong" }, { "user-agent": "API test", "x-forwarded-for": "203.0.113.8, 10.0.0.1" }));
+      const response = await verifyPasscode(request("http://localhost/api/events/verify-passcode", { eventId: "event-1", passcode: "999999" }, { "user-agent": "API test", "x-forwarded-for": "203.0.113.8, 10.0.0.1" }));
 
       expect(response.status).toBe(401);
       expect(mocks.finishPasscodeAttempt).toHaveBeenCalledWith("event-1", "attempt-1", false, "203.0.113.8", "API test");
@@ -209,7 +213,7 @@ describe("API route boundaries", () => {
     });
 
     it("issues a guest cookie and audits a valid passcode", async () => {
-      const response = await verifyPasscode(request("http://localhost/api/events/verify-passcode", { eventId: "event-1", passcode: "correct-passcode" }, { "user-agent": "API test", "x-forwarded-for": "203.0.113.8, 10.0.0.1" }));
+      const response = await verifyPasscode(request("http://localhost/api/events/verify-passcode", { eventId: "event-1", passcode: "123456" }, { "user-agent": "API test", "x-forwarded-for": "203.0.113.8, 10.0.0.1" }));
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ success: true, eventId: "event-1" });
@@ -292,21 +296,23 @@ describe("API route boundaries", () => {
   describe("event and admin APIs", () => {
     it("requires an admin session and validates event creation input", async () => {
       mocks.getServerSession.mockResolvedValueOnce(null);
-      const unauthorized = await createEvent(request("http://localhost/api/events", { title: "A", passcode: "1234" }));
-      const invalid = await createAdminEvent(request("http://localhost/api/admin/events/create", { name: "   ", passcode: "1234" }));
+      const unauthorized = await createEvent(request("http://localhost/api/events", { title: "A", passcode: "123456" }));
+      const invalid = await createAdminEvent(request("http://localhost/api/admin/events/create", { name: "   ", passcode: "123456" }));
+      const invalidPasscode = await createEvent(request("http://localhost/api/events", { title: "Gala", passcode: "12A456" }));
 
       expect(unauthorized.status).toBe(401);
       expect(invalid.status).toBe(400);
+      expect(invalidPasscode.status).toBe(400);
       expect(mocks.prisma.event.create).not.toHaveBeenCalled();
     });
 
     it("creates a protected event and keeps it when Rekognition setup fails", async () => {
       mocks.initializeEventCollection.mockRejectedValue(new Error("AWS unavailable"));
 
-      const response = await createEvent(request("http://localhost/api/events", { title: "  Gala  ", passcode: " 1234 ", guestUploadPolicy: "allowed" }));
+      const response = await createEvent(request("http://localhost/api/events", { title: "  Gala  ", passcode: " 123456 ", guestUploadPolicy: "allowed" }));
 
       expect(response.status).toBe(201);
-      expect(mocks.encryptEventPasscode).toHaveBeenCalledWith(" 1234 ");
+      expect(mocks.encryptEventPasscode).toHaveBeenCalledWith(" 123456 ");
       expect(mocks.prisma.event.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ title: "  Gala  ", passcode: "encrypted-passcode", ownerId: "owner-1" }),
       });
@@ -315,8 +321,8 @@ describe("API route boundaries", () => {
 
     it("verifies a guest passcode and refuses invalid credentials", async () => {
       mocks.verifyEventPasscode.mockResolvedValueOnce(false);
-      const denied = await verifyEvent(request("http://localhost/api/events/event-1/verify", { passcode: "wrong" }), { params: Promise.resolve({ eventId: "event-1" }) });
-      const accepted = await verifyEvent(request("http://localhost/api/events/event-1/verify", { passcode: "right" }), { params: Promise.resolve({ eventId: "event-1" }) });
+      const denied = await verifyEvent(request("http://localhost/api/events/event-1/verify", { passcode: "999999" }), { params: Promise.resolve({ eventId: "event-1" }) });
+      const accepted = await verifyEvent(request("http://localhost/api/events/event-1/verify", { passcode: "123456" }), { params: Promise.resolve({ eventId: "event-1" }) });
 
       expect(denied.status).toBe(401);
       expect(accepted.status).toBe(200);
@@ -439,20 +445,69 @@ describe("API route boundaries", () => {
       expect(mocks.prisma.asset.updateMany).not.toHaveBeenCalled();
     });
 
+    it("persists the Rekognition exception when backend processing fails", async () => {
+      mocks.prisma.asset.findUnique.mockResolvedValue({ ...ownerAsset, status: "uploaded" });
+      mocks.prisma.faceDetection.findMany.mockResolvedValue([]);
+      const rekognitionError = new Error("IndexFaces denied by policy");
+      rekognitionError.name = "AccessDeniedException";
+      mocks.rekognitionSend.mockRejectedValueOnce(rekognitionError);
+
+      const response = await completeUpload(request("http://localhost/api/upload/complete", { assetId: "asset-1" }));
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ error: "Processing failed" });
+      expect(mocks.prisma.asset.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({
+        data: { status: "failed", errorMessage: "IndexFaces denied by policy" },
+      }));
+    });
+
+    it("backs off and retries Rekognition face-search throttling", async () => {
+      mocks.prisma.asset.findUnique.mockResolvedValue({ ...ownerAsset, status: "uploaded" });
+      mocks.prisma.asset.findFirst.mockResolvedValue({ id: "asset-1" });
+      mocks.prisma.faceDetection.findMany.mockResolvedValue([]);
+      mocks.prisma.person.create.mockResolvedValue({ id: "person-1" });
+      mocks.prisma.faceDetection.upsert.mockResolvedValue({});
+      mocks.prisma.faceSample.upsert.mockResolvedValue({});
+      mocks.prisma.asset.updateMany.mockResolvedValue({ count: 1 });
+      mocks.prisma.$transaction.mockImplementation(async (callback) => callback({
+        asset: { updateMany: mocks.prisma.asset.updateMany },
+        person: { create: mocks.prisma.person.create },
+        faceDetection: { upsert: mocks.prisma.faceDetection.upsert },
+        faceSample: { upsert: mocks.prisma.faceSample.upsert },
+      }));
+      const throttleError = new Error("Provisioned rate exceeded");
+      throttleError.name = "ProvisionedThroughputExceededException";
+      mocks.rekognitionSend
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ FaceRecords: [{ Face: { FaceId: "face-1", Confidence: 88, BoundingBox: {} } }] })
+        .mockRejectedValueOnce(throttleError)
+        .mockResolvedValueOnce({ FaceMatches: [] });
+
+      const response = await completeUpload(request("http://localhost/api/upload/complete", { assetId: "asset-1" }));
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ success: true, detected: 1 });
+      expect(mocks.rekognitionSend).toHaveBeenCalledTimes(4);
+    });
+
     it("records upload failure only for an authorized owner", async () => {
       const deniedAsset = await reportUploadFailure(request("http://localhost/api/upload/fail", { assetId: "asset-1" }));
       mocks.prisma.asset.findUnique.mockResolvedValue(ownerAsset);
       mocks.getEventAuthorization.mockResolvedValue({ event, isOwner: false, isGuest: false });
       const deniedAuth = await reportUploadFailure(request("http://localhost/api/upload/fail", { assetId: "asset-1" }));
       mocks.getEventAuthorization.mockResolvedValue({ event, isOwner: true, isGuest: false });
-      const accepted = await reportUploadFailure(request("http://localhost/api/upload/fail", { assetId: "asset-1" }));
+      const accepted = await reportUploadFailure(request("http://localhost/api/upload/fail", {
+        assetId: "asset-1",
+        failureStage: "s3-put",
+        errorMessage: "Storage upload failed (503) https://signed.example/private?signature=secret",
+      }));
 
       expect(deniedAsset.status).toBe(404);
       expect(deniedAuth.status).toBe(401);
       expect(accepted.status).toBe(200);
       expect(mocks.prisma.asset.updateMany).toHaveBeenCalledWith(expect.objectContaining({
         where: expect.objectContaining({ id: "asset-1" }),
-        data: { status: "failed", errorMessage: "Client upload or processing failed." },
+        data: { status: "failed", errorMessage: "CLIENT_FAILURE[s3-put]: Storage upload failed (503) [url]" },
       }));
     });
 
@@ -493,6 +548,18 @@ describe("API route boundaries", () => {
       expect(badFormat.status).toBe(400);
       expect(badQuality.status).toBe(400);
       expect(mocks.s3Send).not.toHaveBeenCalled();
+    });
+
+    it("returns an upstream error instead of mislabeling S3 failures as access denied", async () => {
+      mocks.prisma.asset.findFirst.mockResolvedValue(ownerAsset);
+      mocks.getServerSession.mockResolvedValue({ user: { id: "owner-1" } });
+      mocks.s3Send.mockRejectedValueOnce(new Error("S3 image read failed"));
+      vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const response = await viewUpload(new Request("http://localhost/api/upload/view?key=events%2Fevent-1%2Fapproved%2Fphoto.jpg"));
+
+      expect(response.status).toBe(502);
+      expect(await response.text()).toBe("Media source unavailable");
     });
 
     it("refuses video objects from the image-view endpoint", async () => {

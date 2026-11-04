@@ -12,9 +12,9 @@ Vault OS processes private event media and biometric information. This guide des
 
 ## Passcodes and throttling
 
-New event passcodes are normalized (trimmed and uppercased) and encrypted with AES-256-GCM using a key derived from `NEXTAUTH_SECRET`. The verifier also accepts legacy plaintext values and scrypt hashes. A successful plaintext legacy check can migrate that value to AES-GCM; an scrypt hash is one-way and cannot be displayed, so the admin passcode-display flow rotates it to a newly generated code stored in encrypted form. The owner must share any rotated code with guests.
+New event passcodes contain exactly six decimal digits and are encrypted with AES-256-GCM using a key derived from `NEXTAUTH_SECRET`. The verifier accepts current encrypted values and legacy plaintext/scrypt values only when the submitted code is six digits. The admin passcode-display flow rotates any non-numeric or non-recoverable legacy value to a new six-digit code stored in encrypted form. The owner must share any rotated code with guests; existing guest sessions are invalidated when the code changes.
 
-Passcode attempts are tracked in PostgreSQL under transaction-scoped advisory locks. Current limits are 10 attempts per event/client IP and 1,000 attempts per event in a 15-minute window. `getClientIp` trusts a valid `X-Real-IP`; it does not parse `X-Forwarded-For`. In production, place the app behind a trusted proxy that overwrites `X-Real-IP`; direct internet exposure can let clients choose that header.
+Passcode attempts are tracked in PostgreSQL under transaction-scoped advisory locks. Limits are five failed attempts per client IP in 15 minutes and 100 failed/reserved attempts per event in 24 hours. Successful reservations are removed from the failed-attempt log. `getClientIp` trusts a valid `X-Real-IP`; it does not parse `X-Forwarded-For`. In production, place the app behind a trusted proxy that overwrites `X-Real-IP`; direct internet exposure can let clients choose that header.
 
 ## Media storage
 

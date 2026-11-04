@@ -88,5 +88,6 @@ Browser-to-S3 presigned uploads require bucket CORS that permits the exact app o
 - Next.js output goes to `.next` unless `NEXT_DIST_DIR` is set. Playwright uses a port-specific output directory to avoid colliding with the local dev server.
 - Admin event pages issue a one-time `ADMIN_ACCESS` telemetry request per browser session and event.
 - Event creation attempts Rekognition collection initialization but does not roll back the database event if AWS setup fails; monitor logs and initialize/reconcile the collection before relying on face processing.
+- Face matching uses bounded in-process concurrency and retries throttling responses. If events still show `ProvisionedThroughputExceededException`, inspect the asset's stored error detail and server logs, then check Rekognition quotas; do not immediately increase concurrency.
 - Database schema changes currently use `prisma db push` in the documented local flow. Establish and use a migration workflow before production schema changes.
 - For production deployment, set `NODE_ENV=production`, HTTPS `NEXTAUTH_URL`, durable secrets, DB backups, private S3, explicit lifecycle/retention, and monitoring for AWS/processing failures.

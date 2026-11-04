@@ -2,9 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 
-const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
-const MAX_FAILED_ATTEMPTS = 10;
-const MAX_EVENT_ATTEMPTS = 1000;
+const CLIENT_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const EVENT_ATTEMPT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_CLIENT_FAILED_ATTEMPTS = 5;
+const MAX_EVENT_FAILED_ATTEMPTS = 100;
 
 export function getClientIp(headers: Headers) {
   const trustedIp = headers.get("x-real-ip")?.trim();
@@ -16,7 +17,8 @@ function advisoryLockId(value: string) {
 }
 
 export async function reservePasscodeAttempt(eventId: string, clientIp: string) {
-  const since = new Date(Date.now() - ATTEMPT_WINDOW_MS);
+  const clientSince = new Date(Date.now() - CLIENT_ATTEMPT_WINDOW_MS);
+  const eventSince = new Date(Date.now() - EVENT_ATTEMPT_WINDOW_MS);
   const lockIds = [...new Set([
     advisoryLockId(`event:${eventId}`),
     advisoryLockId(`client:${eventId}:${clientIp}`),
@@ -30,13 +32,13 @@ export async function reservePasscodeAttempt(eventId: string, clientIp: string) 
     const countedActions = ["ACCESS_DENIED", "PASSCODE_ATTEMPT"];
     const [eventAttempts, clientAttempts] = await Promise.all([
       transaction.accessLog.count({
-        where: { eventId, action: { in: countedActions }, createdAt: { gte: since } },
+        where: { eventId, action: { in: countedActions }, createdAt: { gte: eventSince } },
       }),
       transaction.accessLog.count({
-        where: { eventId, action: { in: countedActions }, ipAddress: clientIp, createdAt: { gte: since } },
+        where: { eventId, action: { in: countedActions }, ipAddress: clientIp, createdAt: { gte: clientSince } },
       }),
     ]);
-    if (eventAttempts >= MAX_EVENT_ATTEMPTS || clientAttempts >= MAX_FAILED_ATTEMPTS) return null;
+    if (eventAttempts >= MAX_EVENT_FAILED_ATTEMPTS || clientAttempts >= MAX_CLIENT_FAILED_ATTEMPTS) return null;
 
     const reservation = await transaction.accessLog.create({
       data: {

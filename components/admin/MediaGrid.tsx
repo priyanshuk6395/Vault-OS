@@ -23,6 +23,7 @@ export interface MediaAsset {
   storageKey: string;
   status: string;
   moderationState: string;
+  errorMessage?: string | null;
   url: string | null;
   uploader?: { name: string; role: string };
 }
@@ -142,6 +143,15 @@ function AdminGridItem({ asset, onClick, onDelete, isDeleting, isEditing, isSele
             MOD: {asset.moderationState === "approved" ? "OK" : "PENDING"}
           </span>
         </div>
+        {asset.status === "failed" && asset.errorMessage && (
+          <p
+            className="mt-2 line-clamp-2 wrap-break-word text-[10px] leading-snug text-accent-coral"
+            title={asset.errorMessage}
+            aria-label={`Processing failure: ${asset.errorMessage}`}
+          >
+            {asset.errorMessage}
+          </p>
+        )}
       </div>
     </motion.div>
   );

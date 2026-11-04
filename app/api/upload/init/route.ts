@@ -90,7 +90,8 @@ export async function POST(req: Request) {
     const prepared = validatedFiles.map((file, clientIndex) => {
       const assetId = file.clientUploadId || uuidv4();
       const extension = file.filename.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
-      const storageKey = `events/${eventId}/${folderName}/${assetId}.${extension}`;
+      const rawSegment = process.env.MEDIA_PROCESSING_MODE === "lambda" ? "/raw" : "";
+      const storageKey = `events/${eventId}/${folderName}${rawSegment}/${assetId}.${extension}`;
       return { file, clientIndex, assetId, storageKey };
     });
 

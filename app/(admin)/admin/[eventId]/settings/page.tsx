@@ -181,8 +181,12 @@ export default function SettingsPage() {
                 <input 
                   type="text" 
                   value={confirmText} 
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder="Enter current passcode"
+                  onChange={(e) => setConfirmText(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  maxLength={6}
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  autoComplete="one-time-code"
+                  placeholder="Enter six-digit passcode"
                   className="w-full bg-card border border-input rounded-md px-4 py-3 text-[13px] font-mono text-foreground focus:border-red-500/50 focus:bg-red-500/5 outline-none transition-all placeholder:text-muted-foreground"
                 />
               </div>

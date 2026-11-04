@@ -3,11 +3,12 @@
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { issueGuestSessionCookie } from "@/lib/guest-session";
-import { migrateLegacyPasscodeIfCurrent, verifyEventPasscode } from "@/lib/passcode";
+import { isValidEventPasscode, migrateLegacyPasscodeIfCurrent, verifyEventPasscode } from "@/lib/passcode";
 import { finishPasscodeAttempt, getClientIp, reservePasscodeAttempt } from "@/lib/passcode-attempts";
 
 export async function verifyGuestAccess(eventId: string, passcode: string) {
   try {
+    if (!isValidEventPasscode(passcode)) return { success: false };
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       select: { passcode: true }
