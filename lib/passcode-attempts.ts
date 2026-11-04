@@ -26,7 +26,7 @@ export async function reservePasscodeAttempt(eventId: string, clientIp: string) 
 
   return prisma.$transaction(async (transaction) => {
     for (const lockId of lockIds) {
-      await transaction.$queryRaw`SELECT pg_advisory_xact_lock(${lockId})`;
+      await transaction.$queryRaw`SELECT pg_advisory_xact_lock(${lockId}) IS NULL`;
     }
 
     const countedActions = ["ACCESS_DENIED", "PASSCODE_ATTEMPT"];

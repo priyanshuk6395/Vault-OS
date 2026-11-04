@@ -39,6 +39,7 @@ describe("passcode attempt controls", () => {
 
     expect(mocks.transaction).toHaveBeenCalledOnce();
     expect(mocks.queryRaw).toHaveBeenCalled();
+    expect(mocks.queryRaw.mock.calls[0][0].join("?")).toBe("SELECT pg_advisory_xact_lock(?) IS NULL");
     expect(mocks.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ eventId: "event-1", action: "PASSCODE_ATTEMPT", ipAddress: "203.0.113.8" }),
       select: { id: true },
