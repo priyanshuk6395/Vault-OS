@@ -67,7 +67,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
     });
 
     if (!detection) return NextResponse.json({ error: "Identity found in AWS but not in DB." }, { status: 404 });
-    if (isGuest) await issueGuestPersonCookie(eventId, detection.personId, undefined, event.passcode);
+    await issueGuestPersonCookie(eventId, detection.personId, undefined, event.passcode);
 
     // 5. FETCH THEIR ASSETS
     const myPhotos = await prisma.asset.findMany({

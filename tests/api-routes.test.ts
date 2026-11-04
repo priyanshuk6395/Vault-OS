@@ -760,6 +760,20 @@ describe("API route boundaries", () => {
       expect(mocks.rekognitionSend).toHaveBeenCalledTimes(2);
     });
 
+    it("issues a guest-person session when an event owner completes face search", async () => {
+      mocks.getEventAuthorization.mockResolvedValue({ event, isOwner: true, isGuest: false });
+      mocks.rekognitionSend
+        .mockResolvedValueOnce({ Status: "SUCCEEDED", Confidence: 99, ReferenceImage: { Bytes: new Uint8Array([1, 2, 3]) } })
+        .mockResolvedValueOnce({ FaceMatches: [{ Face: { FaceId: "face-1" } }] });
+      mocks.prisma.faceDetection.findFirst.mockResolvedValue({ personId: "person-1", person: { name: "Alex" } });
+      mocks.prisma.asset.findMany.mockResolvedValue([{ id: "asset-1" }]);
+
+      const response = await findMe(request("http://localhost/api/events/event-1/find-me", { sessionId: "session-1" }), eventContext);
+
+      expect(response.status).toBe(200);
+      expect(mocks.issueGuestPersonCookie).toHaveBeenCalledWith("event-1", "person-1", undefined, event.passcode);
+    });
+
     it("confines face-review lookups to the requested event and rejects unknown actions", async () => {
       mocks.prisma.faceDetection.findFirst.mockResolvedValue({ id: "detection-1", personId: "person-1", faceId: "face-1" });
 
